@@ -1,13 +1,13 @@
 {
   "bundle_version": "1.0.0",
-  "exported_at": "2026-11-13T12:41:27Z",
+  "exported_at": "2026-11-13T13:07:09Z",
   "solution": {
     "$type": "MASSolutionSet",
-    "$id": "sol-rfid-industrial-proximity-guardian-mas-1794573687",
+    "$id": "sol-rfid-industrial-proximity-guardian-mas-1794575229",
     "$group": "solution",
     "$producer": "rfid-industrial-proximity-guardian-mas",
     "$user": "dtorreci",
-    "$when": "2026-11-13T12:41:27Z",
+    "$when": "2026-11-13T13:07:09Z",
     "fields": {
       "solution_id": "rfid-industrial-proximity-guardian-mas",
       "name": "Sensormatic IDX-4000 RFID Industrial Proximity Guardian \u0026 Multilingual WhatsApp Alert MAS",
@@ -418,25 +418,6 @@
     ],
     "cel_reactors": [
       {
-        "reactor_id": "idx4000_raw_rfid_normalizer",
-        "input_message_type": "RawIngressEvent",
-        "output_message_type": "RawTagRead",
-        "context_query": "",
-        "trigger_condition": "payload.subpath.startsWith('rfid/idx4000') \u0026\u0026 payload.content_type == 'json' \u0026\u0026 has(payload.payload.epc)",
-        "transformation_expression": {
-          "antenna": "int(payload.payload.antenna)",
-          "device_mac": "has(payload.payload.mac) ? string(payload.payload.mac) : '00:50:f9:d1:0a:2b'",
-          "dock_portal": "string(payload.subpath)",
-          "epc": "string(payload.payload.epc)",
-          "read_count": "has(payload.payload.read_count) ? int(payload.payload.read_count) : 1",
-          "reader_id": "has(payload.payload.reader_id) ? string(payload.payload.reader_id) : 'idx4000-d10a2b'",
-          "reader_vendor": "'Sensormatic'",
-          "rssi": "double(payload.payload.rssi)",
-          "timestamp": "has(payload.payload.timestamp) ? string(payload.payload.timestamp) : '2026-11-12T20:30:00Z'"
-        },
-        "cron": ""
-      },
-      {
         "reactor_id": "rfid_kinematic_proximity_guard",
         "input_message_type": "RawTagRead",
         "output_message_type": "TagRadialMotion",
@@ -480,6 +461,25 @@
           "rssi": "double(payload.current_rssi_dbm)",
           "serial_number": "string(payload.serial_number)",
           "timestamp": "has(payload.timestamp) ? string(payload.timestamp) : '2026-11-13T12:35:00Z'"
+        },
+        "cron": ""
+      },
+      {
+        "reactor_id": "idx4000_raw_rfid_normalizer",
+        "input_message_type": "RawIngressEvent",
+        "output_message_type": "RawTagRead",
+        "context_query": "",
+        "trigger_condition": "payload.subpath.startsWith('rfid/idx4000') \u0026\u0026 payload.content_type == 'json' \u0026\u0026 has(payload.payload.epc)",
+        "transformation_expression": {
+          "antenna": "int(payload.payload.antenna)",
+          "device_mac": "has(payload.payload.mac) ? string(payload.payload.mac) : '00:50:f9:d1:0a:2b'",
+          "dock_portal": "string(payload.subpath)",
+          "epc": "string(payload.payload.epc)",
+          "read_count": "has(payload.payload.read_count) ? int(payload.payload.read_count) : 1",
+          "reader_id": "has(payload.payload.reader_id) ? string(payload.payload.reader_id) : 'idx4000-d10a2b'",
+          "reader_vendor": "'Sensormatic'",
+          "rssi": "double(payload.payload.rssi)",
+          "timestamp": "has(payload.payload.timestamp) ? string(payload.payload.timestamp) : '2026-11-12T20:30:00Z'"
         },
         "cron": ""
       }

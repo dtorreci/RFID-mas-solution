@@ -64,7 +64,7 @@
         "output_message_type": "RfidAlertTranslationRequest",
         "transformation_expression": {
           "phone_number": "'all'",
-          "language": "'VAL'",
+          "language": "'ES'",
           "message": "'🎯 ¡Tag posado en antena Keonn Advan-CP1!\\n• GTIN-14: ' + string(payload.gtin14) + '\\n• Serial: ' + string(payload.serial_number) + '\\n• EPC: ' + string(payload.epc_hex) + '\\n• RSSI: ' + string(payload.current_rssi_dbm) + ' dBm\\n• Distancia: ' + string(payload.estimated_distance_m) + ' m\\n• Lector MAC: ' + string(payload.device_mac)",
           "epc_hex": "string(payload.epc_hex)",
           "gtin14": "string(payload.gtin14)",
