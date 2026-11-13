@@ -1,0 +1,12 @@
+{
+  "id": "bindu-whatsapp-plugin",
+  "name": "WhatsApp Notifier Plugin",
+  "version": "1.0.0",
+  "runtime": "bpr",
+  "in": [
+    "SendWhatsAppRequest"
+  ],
+  "out": [
+    "SendWhatsAppResult"
+  ]
+}

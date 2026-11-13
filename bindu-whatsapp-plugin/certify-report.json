@@ -1,0 +1,24 @@
+{
+  "pluginId": "bindu-whatsapp-plugin",
+  "version": "1.0.0",
+  "timestamp": "2026-11-13T11:29:40Z",
+  "status": "warn",
+  "warnings": [
+    "large file detected (26004579 bytes): bindu-whatsapp-plugin"
+  ],
+  "issues": [
+    {
+      "code": "W_GENERIC",
+      "level": "warning",
+      "message": "large file detected (26004579 bytes): bindu-whatsapp-plugin"
+    }
+  ],
+  "checksums": {
+    "attestations/preflight.json": "00d160e08d5fa32899099ae429be754d585f0ff024801af14d9ae9d9ac3c5a94",
+    "bundle": "19e2434d7f6293d62460f40ef95ac85a0153a9c32ae64a16dbb24a94fb1b5aec",
+    "manifest.json": "8fb5e87654c34e4a2d40eacf71ea722eeb497585c416ab245919d44e77f1439a",
+    "sha256sums.txt": "49b59a0f0894dc90e0e6f190de977b7b28aeb2c91f8c43aa32f54b295b81ab18"
+  },
+  "bundlePath": "/home/dtp/solutions/RFID-mas-solution/bindu-whatsapp-plugin.tar.gz",
+  "dryRun": false
+}

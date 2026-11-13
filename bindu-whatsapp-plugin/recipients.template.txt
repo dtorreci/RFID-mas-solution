@@ -1,0 +1,43 @@
+# ==============================================================================
+# Bindu WhatsApp Notification Recipients Address Book Template
+# ==============================================================================
+#
+# Syntax:
+#   Name:Phone:Language
+#
+# Field Definitions:
+#   - Name:     Descriptive identifier for the recipient (e.g. Operator, Supervisor).
+#   - Phone:    International E.164 phone number without spaces or symbols
+#               (e.g., +34XXXXXXXXX, +1XXXXXXXXXX, +44XXXXXXXXXX).
+#   - Language: Target language code for on-the-fly translation by the Semantic AI
+#               Reactor (Ollama SLM):
+#                 * EN:  English
+#                 * ES:  Spanish
+#                 * VAL: Valencian / Catalan
+#                 * IT:  Italian
+#               If omitted, the language is automatically inferred from the phone prefix.
+#
+# Operational Notes:
+#   - Lines starting with '#' are treated as comments and will be ignored.
+#   - Active entries will receive real-time notifications when physical events trigger.
+#   - To activate a contact, remove the leading '#' and fill in a valid phone number.
+#   - Hot-reload is supported: modifications are detected automatically by file mtime.
+#
+# ==============================================================================
+# Example Entries:
+# ==============================================================================
+
+# Shift Operator (English alerts)
+# ShiftSupervisor:+1XXXXXXXXXX:EN
+
+# Maintenance Engineer (Spanish alerts)
+# MaintenanceLead:+34XXXXXXXXX:ES
+
+# Logistics Manager (Valencian alerts)
+# LogisticsCoord:+34XXXXXXXXX:VAL
+
+# Quality Control Specialist (Italian alerts)
+# QualityInspector:+39XXXXXXXXXX:IT
+
+# Default active recipient example:
+Operator:+34XXXXXXXXX:ES

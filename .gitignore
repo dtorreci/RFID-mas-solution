@@ -1,0 +1,12 @@
+*.png
+*.zip
+*.tar
+*.gz
+*.tgz
+*.tar.gz
+*.sha256
+
+# WhatsApp address book and sensitive recipient lists
+recipients.txt
+receipts.txt
+

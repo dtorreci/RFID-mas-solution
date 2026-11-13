@@ -1,0 +1,1576 @@
+{
+  "message_types": [
+    {
+      "name": "EpcSgtinRead",
+      "description": "Decoded SGTIN-96 (Serialized Global Trade Item Number) RFID tag read event for retail and consumer products",
+      "emoji": "\ud83c\udff7\ufe0f",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN (e.g. urn:epc:tag:sgtin-96:3.0614141.107346.2026)"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (SGTIN-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value (0: All, 1: POS, 2: Full Case, 3: Reserved, 4: Inner Pack)"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "item_reference",
+          "type": "string",
+          "required": true,
+          "description": "Item or SKU Reference number"
+        },
+        {
+          "name": "serial_number",
+          "type": "string",
+          "required": true,
+          "description": "Unique item serial number"
+        },
+        {
+          "name": "gtin14",
+          "type": "string",
+          "required": false,
+          "description": "Constructed 14-digit GTIN barcode identifier"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID (1-4)"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": true,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "phase_deg",
+          "type": "number",
+          "required": false,
+          "description": "RF phase angle in degrees (0-360)"
+        },
+        {
+          "name": "doppler_shift_hz",
+          "type": "number",
+          "required": false,
+          "description": "Estimated Doppler frequency shift"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcSsccRead",
+      "description": "Decoded SSCC-96 (Serial Shipping Container Code) RFID tag read event for logistics pallets and shipping containers",
+      "emoji": "\ud83d\udce6",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (SSCC-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Filter description"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "extension_digit",
+          "type": "string",
+          "required": false,
+          "description": "SSCC extension digit"
+        },
+        {
+          "name": "serial_reference",
+          "type": "string",
+          "required": true,
+          "description": "Serial reference number"
+        },
+        {
+          "name": "sscc18",
+          "type": "string",
+          "required": true,
+          "description": "Constructed 18-digit SSCC logistics container identifier"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID (1-4)"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": true,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "phase_deg",
+          "type": "number",
+          "required": false,
+          "description": "RF phase angle in degrees (0-360)"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        }
+      ]
+    },
+    {
+      "name": "EpcSglnRead",
+      "description": "Decoded SGLN-96 (Global Location Number with Extension) RFID tag read event for dock doors, berths, and facilities",
+      "emoji": "\ud83d\udccd",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (SGLN-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "location_reference",
+          "type": "string",
+          "required": true,
+          "description": "Location reference"
+        },
+        {
+          "name": "gln_extension",
+          "type": "string",
+          "required": false,
+          "description": "GLN extension"
+        },
+        {
+          "name": "gln13",
+          "type": "string",
+          "required": true,
+          "description": "Constructed 13-digit GLN location identifier"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcGraiRead",
+      "description": "Decoded GRAI-96 (Global Returnable Asset Identifier) RFID tag read event for reusable totes, crates, kegs, and pallets",
+      "emoji": "\ud83d\udd04",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (GRAI-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "asset_type",
+          "type": "string",
+          "required": true,
+          "description": "Asset type reference"
+        },
+        {
+          "name": "serial_number",
+          "type": "string",
+          "required": true,
+          "description": "Serial number of returnable asset"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcGiaiRead",
+      "description": "Decoded GIAI-96 (Global Individual Asset Identifier) RFID tag read event for fixed machinery, forklifts, and vehicles",
+      "emoji": "\ud83d\ude9c",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (GIAI-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "individual_asset_reference",
+          "type": "string",
+          "required": true,
+          "description": "Individual asset reference"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcGsrnRead",
+      "description": "Decoded GSRN-96 (Global Service Relation Number) RFID tag read event for service recipients, staff, and drivers",
+      "emoji": "\ud83d\udc64",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (GSRN-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "service_reference",
+          "type": "string",
+          "required": true,
+          "description": "Service reference"
+        },
+        {
+          "name": "gsrn18",
+          "type": "string",
+          "required": false,
+          "description": "Constructed 18-digit GSRN identifier"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcGdtiRead",
+      "description": "Decoded GDTI-96 (Global Document Type Identifier) RFID tag read event for customs documents, manifests, and certificates",
+      "emoji": "\ud83d\udcc4",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (GDTI-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "document_type",
+          "type": "string",
+          "required": true,
+          "description": "Document type code"
+        },
+        {
+          "name": "serial_number",
+          "type": "string",
+          "required": true,
+          "description": "Document serial number"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcCpiRead",
+      "description": "Decoded CPI-96 (Component / Part Identifier) RFID tag read event for automotive and aerospace serialized subassemblies",
+      "emoji": "\u2699\ufe0f",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (CPI-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "component_part_reference",
+          "type": "string",
+          "required": true,
+          "description": "Component part reference number"
+        },
+        {
+          "name": "serial_number",
+          "type": "string",
+          "required": true,
+          "description": "Component serial number"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcSgcnRead",
+      "description": "Decoded SGCN-96 (Serialized Global Coupon Number) RFID tag read event for high-value vouchers, rebates, and tickets",
+      "emoji": "\ud83c\udf9f\ufe0f",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (SGCN-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "coupon_reference",
+          "type": "string",
+          "required": true,
+          "description": "Coupon reference code"
+        },
+        {
+          "name": "serial_number",
+          "type": "string",
+          "required": true,
+          "description": "Coupon serial number"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcItipRead",
+      "description": "Decoded ITIP-96 (Individual Trade Item Piece) RFID tag read event for variable piece goods (coils, rolls, lumber)",
+      "emoji": "\ud83e\udeb5",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (ITIP-96)"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": true,
+          "description": "GS1 Company Prefix"
+        },
+        {
+          "name": "piece_item_reference",
+          "type": "string",
+          "required": true,
+          "description": "Piece item reference"
+        },
+        {
+          "name": "piece_number",
+          "type": "string",
+          "required": true,
+          "description": "Piece number"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "EpcGidRead",
+      "description": "Decoded GID-96 (General Identifier) RFID tag read event for raw industrial component identification",
+      "emoji": "\ud83c\udfed",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "Raw 24-character hexadecimal EPC string"
+        },
+        {
+          "name": "canonical_urn",
+          "type": "string",
+          "required": true,
+          "description": "Canonical EPC URN"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "EPC standard identifier (GID-96)"
+        },
+        {
+          "name": "general_manager_number",
+          "type": "string",
+          "required": true,
+          "description": "General manager identifier"
+        },
+        {
+          "name": "object_class",
+          "type": "string",
+          "required": true,
+          "description": "Object class identifier"
+        },
+        {
+          "name": "serial_number",
+          "type": "string",
+          "required": true,
+          "description": "Serial number"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader identifier"
+        },
+        {
+          "name": "peak_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Peak signal strength in dBm"
+        },
+        {
+          "name": "filter_value",
+          "type": "integer",
+          "required": false,
+          "description": "Filter value"
+        },
+        {
+          "name": "company_prefix",
+          "type": "string",
+          "required": false,
+          "description": "GS1 Company Prefix or empty"
+        },
+        {
+          "name": "filter_desc",
+          "type": "string",
+          "required": false,
+          "description": "Human readable filter description"
+        },
+        {
+          "name": "channel_index",
+          "type": "integer",
+          "required": false,
+          "description": "UHF frequency channel index"
+        },
+        {
+          "name": "read_count",
+          "type": "integer",
+          "required": false,
+          "description": "Observations in report window"
+        },
+        {
+          "name": "first_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "First detection timestamp in ISO-8601 UTC"
+        },
+        {
+          "name": "last_seen_utc",
+          "type": "string",
+          "required": false,
+          "description": "Last detection timestamp in ISO-8601 UTC"
+        }
+      ]
+    },
+    {
+      "name": "RfidAntennaTelemetry",
+      "description": "RF physical layer metrics and operational health telemetry for portal antennas 1-4",
+      "emoji": "\ud83d\udce1",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 20,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "LLRP reader identifier"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Portal antenna ID (1-4)"
+        },
+        {
+          "name": "antenna_name",
+          "type": "string",
+          "required": false,
+          "description": "Human readable antenna name"
+        },
+        {
+          "name": "tx_power_cdbm",
+          "type": "integer",
+          "required": true,
+          "description": "RF Transmit power in hundredths of dBm (e.g. 3000 = 30.0 dBm)"
+        },
+        {
+          "name": "mean_rssi_dbm",
+          "type": "number",
+          "required": true,
+          "description": "Sliding average RSSI"
+        },
+        {
+          "name": "noise_floor_dbm",
+          "type": "number",
+          "required": true,
+          "description": "Ambient RF noise floor in dBm"
+        },
+        {
+          "name": "reflection_vswr",
+          "type": "number",
+          "required": false,
+          "description": "Voltage Standing Wave Ratio (1.0 - 2.5)"
+        },
+        {
+          "name": "read_rate_tps",
+          "type": "number",
+          "required": false,
+          "description": "Instantaneous tag read rate in tags/sec"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "description": "Antenna health status: HEALTHY, DEGRADED, DISCONNECTED"
+        }
+      ]
+    },
+    {
+      "name": "PortalTransitEvent",
+      "description": "Deterministic spatial portal transit event synthesized by CEL reactor tracking direction, velocity, and pallet-item consolidation",
+      "emoji": "\ud83d\udeaa",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "portal_id",
+          "type": "string",
+          "required": true,
+          "description": "Portal gate identifier"
+        },
+        {
+          "name": "transit_id",
+          "type": "string",
+          "required": true,
+          "description": "Unique transit event identifier"
+        },
+        {
+          "name": "direction",
+          "type": "string",
+          "required": true,
+          "description": "Transit direction: INBOUND, OUTBOUND, STATIC_STRAY"
+        },
+        {
+          "name": "pallet_sscc",
+          "type": "string",
+          "required": false,
+          "description": "Pallet SSCC identifier"
+        },
+        {
+          "name": "pallet_grai",
+          "type": "string",
+          "required": false,
+          "description": "Pallet GRAI identifier"
+        },
+        {
+          "name": "item_count",
+          "type": "integer",
+          "required": true,
+          "description": "Count of detected child items"
+        },
+        {
+          "name": "estimated_velocity_mps",
+          "type": "number",
+          "required": true,
+          "description": "Estimated transit velocity in meters per second"
+        },
+        {
+          "name": "mean_transit_rssi_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Average RSSI during transit"
+        },
+        {
+          "name": "inbound_peak_time_utc",
+          "type": "string",
+          "required": false,
+          "description": "Peak signal timestamp at inbound antenna"
+        },
+        {
+          "name": "outbound_peak_time_utc",
+          "type": "string",
+          "required": false,
+          "description": "Peak signal timestamp at outbound antenna"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "description": "Transit validation status: CLEARED, ANOMALY_FLAGGED, REJECTED"
+        }
+      ]
+    },
+    {
+      "name": "LogisticsDiscrepancyAlert",
+      "description": "Cognitive SLM anomaly alert emitted when physical pallet RFID reads diverge from expected shipment manifests",
+      "emoji": "\ud83d\udea8",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "alert_id",
+          "type": "string",
+          "required": true,
+          "description": "Unique anomaly alert identifier"
+        },
+        {
+          "name": "portal_id",
+          "type": "string",
+          "required": true,
+          "description": "Portal gate identifier"
+        },
+        {
+          "name": "pallet_sscc",
+          "type": "string",
+          "required": true,
+          "description": "Pallet SSCC identifier"
+        },
+        {
+          "name": "discrepancy_type",
+          "type": "string",
+          "required": true,
+          "description": "Discrepancy classification (compiled as a System One Choice primitive)",
+          "enum": [
+            "MISSING_ITEMS",
+            "UNEXPECTED_SKU",
+            "DUPLICATE_PALLET",
+            "EXPIRED_BATCH",
+            "ANOMALOUS_RF"
+          ]
+        },
+        {
+          "name": "severity",
+          "type": "string",
+          "required": true,
+          "description": "Discrepancy severity (compiled as a System One Choice primitive)",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
+          ]
+        },
+        {
+          "name": "confidence_score",
+          "type": "number",
+          "required": true,
+          "description": "Calibrated System One RLCD mathematical confidence score (0.0 - 1.0)"
+        },
+        {
+          "name": "analysis_summary",
+          "type": "string",
+          "required": true,
+          "description": "Deterministic discrepancy audit breakdown synthesized via Google CEL"
+        },
+        {
+          "name": "recommended_action",
+          "type": "string",
+          "required": false,
+          "description": "Deterministic corrective operational response synthesized via Google CEL"
+        }
+      ]
+    },
+    {
+      "name": "RfidReaderConfig",
+      "description": "Configuration message for LLRP RFID Reader connection and tuning parameters",
+      "emoji": "\ud83d\udd27",
+      "version": "1.0.0",
+      "persist": false,
+      "retentionMode": "count",
+      "retentionValue": 1,
+      "routing": [
+        "local"
+      ],
+      "properties": [
+        {
+          "name": "reader_host",
+          "type": "string",
+          "required": true,
+          "description": "LLRP Reader hostname or IP"
+        },
+        {
+          "name": "reader_port",
+          "type": "integer",
+          "required": true,
+          "description": "LLRP Reader port (default 5084)"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": true,
+          "description": "Identifier of the reader"
+        },
+        {
+          "name": "tx_power_cdbm",
+          "type": "integer",
+          "required": false,
+          "description": "Transmit power in hundredths of dBm"
+        },
+        {
+          "name": "rssi_threshold_dbm",
+          "type": "number",
+          "required": false,
+          "description": "Minimum RSSI threshold in dBm"
+        }
+      ]
+    },
+    {
+      "name": "TagRadialMotion",
+      "description": "Evento cinem\u00e1tico que indica si un tag RFID se acerca o se aleja respecto a una antena espec\u00edfica (Keonn Advan-CP1)",
+      "emoji": "\ud83d\udce1",
+      "version": "1.0.0",
+      "persist": true,
+      "retentionMode": "count",
+      "retentionValue": 100,
+      "routing": [
+        "local",
+        "parent"
+      ],
+      "properties": [
+        {
+          "name": "epc_hex",
+          "type": "string",
+          "required": true,
+          "description": "C\u00f3digo EPC en hexadecimal de 24 caracteres"
+        },
+        {
+          "name": "standard",
+          "type": "string",
+          "required": true,
+          "description": "Est\u00e1ndar EPC (SGTIN-96, GID-96, etc.)"
+        },
+        {
+          "name": "antenna_id",
+          "type": "integer",
+          "required": true,
+          "description": "Puerto f\u00edsico de antena donde se detect\u00f3 el tag"
+        },
+        {
+          "name": "antenna_model",
+          "type": "string",
+          "required": true,
+          "description": "Modelo de la antena (Keonn Advan-CP1 EU)"
+        },
+        {
+          "name": "motion_direction",
+          "type": "string",
+          "required": true,
+          "description": "Dirección cinemática calculada: APPROACHING, RECEDING, STATIONARY, FIRST_SEEN"
+        },
+        {
+          "name": "estimated_distance_m",
+          "type": "number",
+          "required": true,
+          "description": "Distancia radial estimada en metros a la antena Keonn Advan-CP1"
+        },
+        {
+          "name": "distance_correction_margin_m",
+          "type": "number",
+          "required": true,
+          "description": "Margen de corrección de distancia en metros (+/- m) debido a reflexiones multipath y desajuste angular"
+        },
+        {
+          "name": "distance_confidence_zone",
+          "type": "string",
+          "required": true,
+          "description": "Nivel de confianza métrico: NEAR_FIELD_HIGH, MID_TRANSIT_NOMINAL, FAR_FIELD_UNCERTAIN"
+        },
+        {
+          "name": "current_rssi_dbm",
+          "type": "number",
+          "required": true,
+          "description": "Potencia recibida actual en dBm"
+        },
+        {
+          "name": "previous_rssi_dbm",
+          "type": "number",
+          "required": true,
+          "description": "Potencia recibida en la lectura anterior del mismo tag"
+        },
+        {
+          "name": "delta_rssi_dbm",
+          "type": "number",
+          "required": true,
+          "description": "Gradiente de potencia: RSSI_actual - RSSI_anterior"
+        },
+        {
+          "name": "dwell_channel",
+          "type": "integer",
+          "required": false,
+          "description": "Canal de frecuencia RF del salto"
+        },
+        {
+          "name": "gtin14",
+          "type": "string",
+          "required": false,
+          "description": "GTIN-14 decodificado si es SGTIN-96"
+        },
+        {
+          "name": "serial_number",
+          "type": "string",
+          "required": false,
+          "description": "N\u00famero de serie del producto"
+        },
+        {
+          "name": "motion_description",
+          "type": "string",
+          "required": true,
+          "description": "Descripci\u00f3n sem\u00e1ntica del movimiento detectado"
+        },
+        {
+          "name": "timestamp",
+          "type": "string",
+          "required": true,
+          "description": "Marca de tiempo UTC del evento"
+        }
+      ]
+    }
+  ]
+}

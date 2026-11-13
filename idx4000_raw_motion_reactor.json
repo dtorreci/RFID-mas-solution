@@ -1,0 +1,41 @@
+{
+  "$type": "CELReactorSet",
+  "$node-dest": "root",
+  "$group": "mesh",
+  "$producer": "root",
+  "$user": "operator",
+  "$when": "2026-11-12T20:30:00Z",
+  "fields": {
+    "gateway_node_id": "root",
+    "reactors": [
+      {
+        "reactor_id": "idx4000_raw_rfid_kinematic_evaluator",
+        "input_message_type": "RawIngressEvent",
+        "cron": "",
+        "trigger_condition": "payload.subpath.startsWith('rfid/idx4000') && payload.content_type == 'json' && has(payload.payload.epc)",
+        "context_query": "SELECT CAST(json_extract(fields, '$.current_rssi_dbm') AS REAL) as prev_rssi, json_extract(fields, '$.timestamp') as prev_time FROM v_messages WHERE \"$type\" = 'TagRadialMotion' AND json_extract(fields, '$.epc_hex') = json_extract(:payload, '$.payload.epc') ORDER BY \"$arriveTime\" DESC LIMIT 1",
+        "output_message_type": "TagRadialMotion",
+        "transformation_expression": {
+          "epc_hex": "string(payload.payload.epc)",
+          "device_mac": "has(payload.payload.device_mac) ? string(payload.payload.device_mac) : '00:50:F9:D1:0A:2B'",
+          "reader_id": "has(payload.payload.reader_id) ? string(payload.payload.reader_id) : 'idx4000-d10a2b'",
+          "antenna_id": "int(payload.payload.antenna)",
+          "antenna_model": "'Keonn Advan-CP1 EU'",
+          "standard": "'SGTIN-96'",
+          "gtin14": "'07621806175810'",
+          "serial_number": "'12779363114'",
+          "current_rssi_dbm": "double(payload.payload.rssi)",
+          "previous_rssi_dbm": "has(db.rows) && size(db.rows) > 0 && has(db.rows[0].fields) ? double(db.rows[0].fields.prev_rssi) : double(payload.payload.rssi)",
+          "delta_rssi_dbm": "has(db.rows) && size(db.rows) > 0 && has(db.rows[0].fields) ? (double(payload.payload.rssi) - double(db.rows[0].fields.prev_rssi)) : 0.0",
+          "motion_direction": "!has(db.rows) || size(db.rows) == 0 || !has(db.rows[0].fields) ? 'FIRST_SEEN' : ((double(payload.payload.rssi) - double(db.rows[0].fields.prev_rssi)) >= 1.5 ? 'APPROACHING' : ((double(payload.payload.rssi) - double(db.rows[0].fields.prev_rssi)) <= -1.5 ? 'RECEDING' : 'STATIONARY'))",
+          "estimated_distance_m": "double(payload.payload.rssi) >= (73.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 0.01 : (double(payload.payload.rssi) >= (68.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 0.01 + ((73.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) - double(payload.payload.rssi)) * 0.014 : (double(payload.payload.rssi) >= (60.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 0.08 + ((68.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) - double(payload.payload.rssi)) * 0.025 : 0.28 + ((60.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) - double(payload.payload.rssi)) * 0.045))",
+          "distance_correction_margin_m": "double(payload.payload.rssi) >= (73.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 0.01 : (double(payload.payload.rssi) >= (68.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 0.02 : 0.05)",
+          "distance_confidence_zone": "double(payload.payload.rssi) >= (73.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 'ON_ANTENNA_SURFACE' : (double(payload.payload.rssi) >= (68.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 'IMMEDIATE_PROXIMITY' : (double(payload.payload.rssi) >= (60.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 'NEAR_FIELD_ZONE' : 'MID_TRANSIT_ZONE'))",
+          "dwell_channel": "int(payload.payload.channel)",
+          "motion_description": "!has(db.rows) || size(db.rows) == 0 || !has(db.rows[0].fields) ? 'Tag detectado por primera vez en lóbulo Keonn CP1' : ((double(payload.payload.rssi) - double(db.rows[0].fields.prev_rssi)) >= 1.5 ? 'Tag ACERCÁNDOSE a la antena (+ΔRSSI)' : ((double(payload.payload.rssi) - double(db.rows[0].fields.prev_rssi)) <= -1.5 ? 'Tag ALEJÁNDOSE de la antena (-ΔRSSI)' : (double(payload.payload.rssi) >= (73.0 - (30.0 - (has(payload.payload.tx_power) ? double(payload.payload.tx_power) : 12.0))) ? 'Tag en contacto físico sobre el radomo' : 'Tag en posición ESTACIONARIA')))",
+          "timestamp": "string(payload.payload.timestamp)"
+        }
+      }
+    ]
+  }
+}

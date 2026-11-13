@@ -1,0 +1,45 @@
+{
+  "$type": "MASSolutionSet",
+  "$group": "solution",
+  "$producer": "rfid-industrial-proximity-guardian-mas",
+  "$user": "operator",
+  "$when": "2026-11-13T13:30:00Z",
+  "fields": {
+    "solution_id": "rfid-industrial-proximity-guardian-mas",
+    "name": "Sensormatic IDX-4000 RFID Industrial Proximity Guardian & Multilingual WhatsApp Alert MAS",
+    "version": "1.0.0",
+    "description": "Cyber-Physical Multi-Agent System for Industrial RFID. Ingests raw tag reads from Sensormatic IDX-4000 edge readers, computes deterministic radial kinematic proximity over Keonn Advan-CP1 near-field antennas (< 1ms via Google CEL), performs on-the-fly multilingual cognitive translation via local SLM (Ollama qwen2.5:1.5b), and dispatches deduplicated WhatsApp notifications with anti-spam cooldown.",
+    "status": "active",
+    "artifacts": {
+      "mesh_nodes": [
+        "root",
+        "idx4000-00-50-f9-d1-0a-2b"
+      ],
+      "message_types": [
+        "RawTagRead@1.0.0",
+        "TagRadialMotion@1.0.0",
+        "RfidAlertTranslationRequest@1.0.0",
+        "SendWhatsAppRequest@1.0.0",
+        "SendWhatsAppResult@1.0.0"
+      ],
+      "cel_reactors": [
+        "idx4000_raw_rfid_normalizer",
+        "rfid_kinematic_proximity_guard",
+        "rfid_on_surface_translation_dispatcher"
+      ],
+      "rest_reactors": [],
+      "semantic_ai_reactors": [
+        "rfid-ai-copilot-auditor"
+      ],
+      "plugins": [
+        "bindu-idx4000-plugin@1.0.0",
+        "bindu-whatsapp-plugin@1.0.0"
+      ],
+      "media_storage_providers": [],
+      "access_users": [],
+      "access_roles": [],
+      "dashboards": [],
+      "system_config_keys": []
+    }
+  }
+}

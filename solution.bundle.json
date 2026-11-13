@@ -1,0 +1,523 @@
+{
+  "bundle_version": "1.0.0",
+  "exported_at": "2026-11-13T12:41:27Z",
+  "solution": {
+    "$type": "MASSolutionSet",
+    "$id": "sol-rfid-industrial-proximity-guardian-mas-1794573687",
+    "$group": "solution",
+    "$producer": "rfid-industrial-proximity-guardian-mas",
+    "$user": "dtorreci",
+    "$when": "2026-11-13T12:41:27Z",
+    "fields": {
+      "solution_id": "rfid-industrial-proximity-guardian-mas",
+      "name": "Sensormatic IDX-4000 RFID Industrial Proximity Guardian \u0026 Multilingual WhatsApp Alert MAS",
+      "version": "1.0.0",
+      "description": "Cyber-Physical Multi-Agent System for Industrial RFID. Ingests raw tag reads from Sensormatic IDX-4000 edge readers, computes deterministic radial kinematic proximity over Keonn Advan-CP1 near-field antennas (\u003c 1ms via Google CEL), performs on-the-fly multilingual cognitive translation via local SLM (Ollama qwen2.5:1.5b), and dispatches deduplicated WhatsApp notifications with anti-spam cooldown.",
+      "status": "active",
+      "artifacts": {
+        "mesh_nodes": [
+          "root",
+          "idx4000-00-50-f9-d1-0a-2b"
+        ],
+        "message_types": [
+          "RawTagRead@1.0.0",
+          "TagRadialMotion@1.0.0",
+          "RfidAlertTranslationRequest@1.0.0",
+          "SendWhatsAppRequest@1.0.0",
+          "SendWhatsAppResult@1.0.0"
+        ],
+        "cel_reactors": [
+          "idx4000_raw_rfid_normalizer",
+          "rfid_kinematic_proximity_guard",
+          "rfid_on_surface_translation_dispatcher"
+        ],
+        "semantic_ai_reactors": [
+          "rfid-ai-copilot-auditor"
+        ],
+        "plugins": [
+          "bindu-idx4000-plugin@1.0.0",
+          "bindu-whatsapp-plugin@1.0.0"
+        ]
+      }
+    }
+  },
+  "artifacts": {
+    "message_types": [
+      {
+        "description": "Evento cinemático que indica si un tag RFID se acerca o se aleja respecto a una antena específica (Keonn Advan-CP1)",
+        "emoji": "📡",
+        "name": "TagRadialMotion",
+        "persist": true,
+        "properties": [
+          {
+            "description": "Código EPC en hexadecimal de 24 caracteres",
+            "name": "epc_hex",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Estándar EPC (SGTIN-96, GID-96, etc.)",
+            "name": "standard",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Puerto físico de antena donde se detectó el tag",
+            "name": "antenna_id",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "description": "Modelo de la antena (Keonn Advan-CP1 EU)",
+            "name": "antenna_model",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Dirección cinemática calculada: APPROACHING, RECEDING, STATIONARY, FIRST_SEEN",
+            "name": "motion_direction",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Distancia radial estimada en metros a la antena Keonn Advan-CP1",
+            "name": "estimated_distance_m",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "description": "Margen de corrección de distancia en metros (+/- m) debido a reflexiones multipath y desajuste angular",
+            "name": "distance_correction_margin_m",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "description": "Nivel de confianza métrico: NEAR_FIELD_HIGH, MID_TRANSIT_NOMINAL, FAR_FIELD_UNCERTAIN",
+            "name": "distance_confidence_zone",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Potencia recibida actual en dBm",
+            "name": "current_rssi_dbm",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "description": "Potencia recibida en la lectura anterior del mismo tag",
+            "name": "previous_rssi_dbm",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "description": "Gradiente de potencia: RSSI_actual - RSSI_anterior",
+            "name": "delta_rssi_dbm",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "description": "Canal de frecuencia RF del salto",
+            "name": "dwell_channel",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "description": "GTIN-14 decodificado si es SGTIN-96",
+            "name": "gtin14",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Número de serie del producto",
+            "name": "serial_number",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Descripción semántica del movimiento detectado",
+            "name": "motion_description",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Marca de tiempo UTC del evento",
+            "name": "timestamp",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Dirección MAC del lector RFID hardware",
+            "name": "device_mac",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Identificador único del lector RFID",
+            "name": "reader_id",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "retentionMode": "count",
+        "retentionValue": 100,
+        "routing": [
+          "local",
+          "parent"
+        ],
+        "version": "1.0.0"
+      },
+      {
+        "description": "Evento normalizado de lectura RFID proveniente de cualquier hardware (Sensormatic, Zebra, Hopeland)",
+        "emoji": "🏷️",
+        "name": "RawTagRead",
+        "persist": true,
+        "properties": [
+          {
+            "description": "EPC hex string",
+            "name": "epc",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Dirección MAC física del lector",
+            "name": "device_mac",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "ID lógico del lector",
+            "name": "reader_id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Puerto de antena",
+            "name": "antenna",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "description": "RSSI medido en dBm",
+            "name": "rssi",
+            "required": true,
+            "type": "number"
+          },
+          {
+            "description": "Contador de lecturas",
+            "name": "read_count",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "description": "Fabricante del lector",
+            "name": "reader_vendor",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Subpath de ubicación",
+            "name": "dock_portal",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Timestamp ISO 8601 de la lectura",
+            "name": "timestamp",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "retentionMode": "count",
+        "retentionValue": 50,
+        "routing": [
+          "local",
+          "parent"
+        ],
+        "version": "1.0.0"
+      },
+      {
+        "description": "Petición de envío de mensaje de WhatsApp con datos de tag RFID",
+        "emoji": "💬",
+        "name": "SendWhatsAppRequest",
+        "persist": true,
+        "properties": [
+          {
+            "description": "Número de teléfono destino en formato internacional (ej: 34612345678)",
+            "name": "phone_number",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Texto del mensaje de WhatsApp",
+            "name": "message_text",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "EPC en hexadecimal",
+            "name": "epc_hex",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "GTIN-14 decodificado",
+            "name": "gtin14",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Número de serie decodificado",
+            "name": "serial_number",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "RSSI de lectura en dBm",
+            "name": "rssi",
+            "required": false,
+            "type": "number"
+          },
+          {
+            "description": "Dirección MAC física del lector",
+            "name": "reader_mac",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Timestamp ISO 8601 del evento",
+            "name": "timestamp",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "retentionMode": "count",
+        "retentionValue": 50,
+        "routing": [
+          "local"
+        ],
+        "version": "1.0.0"
+      },
+      {
+        "description": "Resultado de auditoría del envío de WhatsApp por el plugin BPR",
+        "emoji": "📲",
+        "name": "SendWhatsAppResult",
+        "persist": true,
+        "properties": [
+          {
+            "description": "Estado del envío: SENT, FAILED, SIMULATED",
+            "name": "status",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Número de teléfono destino",
+            "name": "phone_number",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Identificador único del mensaje en la red WhatsApp",
+            "name": "message_id",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "EPC asociado",
+            "name": "epc_hex",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Detalle del error si falló",
+            "name": "error_message",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Timestamp ISO 8601 del envío",
+            "name": "timestamp",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "retentionMode": "count",
+        "retentionValue": 50,
+        "routing": [
+          "local"
+        ],
+        "version": "1.0.0"
+      },
+      {
+        "description": "Solicitud de traducción de alerta RFID generada por CEL hacia el Semantic AI Reactor",
+        "emoji": "🌐",
+        "name": "RfidAlertTranslationRequest",
+        "persist": true,
+        "properties": [
+          {
+            "description": "Teléfono internacional del destinatario",
+            "name": "phone_number",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Idioma explícito del destinatario (ej: ES, IT, EN) o vacío para deducir por prefijo",
+            "name": "language",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Mensaje original base a traducir",
+            "name": "message",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "EPC en hexadecimal",
+            "name": "epc_hex",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "GTIN-14 del activo",
+            "name": "gtin14",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Número de serie",
+            "name": "serial_number",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Potencia recibida en dBm",
+            "name": "rssi",
+            "required": false,
+            "type": "number"
+          },
+          {
+            "description": "Dirección MAC del lector",
+            "name": "reader_mac",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "description": "Marca de tiempo UTC",
+            "name": "timestamp",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "retentionMode": "count",
+        "retentionValue": 50,
+        "routing": [
+          "local"
+        ],
+        "version": "1.0.0"
+      }
+    ],
+    "cel_reactors": [
+      {
+        "reactor_id": "idx4000_raw_rfid_normalizer",
+        "input_message_type": "RawIngressEvent",
+        "output_message_type": "RawTagRead",
+        "context_query": "",
+        "trigger_condition": "payload.subpath.startsWith('rfid/idx4000') \u0026\u0026 payload.content_type == 'json' \u0026\u0026 has(payload.payload.epc)",
+        "transformation_expression": {
+          "antenna": "int(payload.payload.antenna)",
+          "device_mac": "has(payload.payload.mac) ? string(payload.payload.mac) : '00:50:f9:d1:0a:2b'",
+          "dock_portal": "string(payload.subpath)",
+          "epc": "string(payload.payload.epc)",
+          "read_count": "has(payload.payload.read_count) ? int(payload.payload.read_count) : 1",
+          "reader_id": "has(payload.payload.reader_id) ? string(payload.payload.reader_id) : 'idx4000-d10a2b'",
+          "reader_vendor": "'Sensormatic'",
+          "rssi": "double(payload.payload.rssi)",
+          "timestamp": "has(payload.payload.timestamp) ? string(payload.payload.timestamp) : '2026-11-12T20:30:00Z'"
+        },
+        "cron": ""
+      },
+      {
+        "reactor_id": "rfid_kinematic_proximity_guard",
+        "input_message_type": "RawTagRead",
+        "output_message_type": "TagRadialMotion",
+        "context_query": "",
+        "trigger_condition": "has(payload.epc) \u0026\u0026 size(string(payload.epc)) \u003e 0",
+        "transformation_expression": {
+          "antenna_id": "int(payload.antenna)",
+          "antenna_model": "'Keonn Advan-CP1 EU'",
+          "current_rssi_dbm": "double(payload.rssi)",
+          "delta_rssi_dbm": "0.0",
+          "device_mac": "string(payload.device_mac)",
+          "distance_confidence_zone": "double(payload.rssi) \u003e= 55.0 ? 'ON_ANTENNA_SURFACE' : (double(payload.rssi) \u003e= 50.0 ? 'IMMEDIATE_PROXIMITY' : (double(payload.rssi) \u003e= 42.0 ? 'NEAR_FIELD_ZONE' : 'MID_TRANSIT_ZONE'))",
+          "distance_correction_margin_m": "double(payload.rssi) \u003e= 55.0 ? 0.01 : (double(payload.rssi) \u003e= 50.0 ? 0.02 : 0.05)",
+          "dwell_channel": "1",
+          "epc_hex": "string(payload.epc)",
+          "estimated_distance_m": "double(payload.rssi) \u003e= 55.0 ? 0.01 : (double(payload.rssi) \u003e= 50.0 ? 0.01 + (55.0 - double(payload.rssi)) * 0.014 : (double(payload.rssi) \u003e= 42.0 ? 0.08 + (50.0 - double(payload.rssi)) * 0.025 : 0.28 + (42.0 - double(payload.rssi)) * 0.045))",
+          "gtin14": "'07621806175810'",
+          "motion_description": "double(payload.rssi) \u003e= 55.0 ? 'Tag literalmente POSADO sobre la antena Keonn (Contacto Físico)' : (double(payload.rssi) \u003e= 50.0 ? 'Tag en PROXIMIDAD INMEDIATA (2-5 cm)' : 'Tag en CAMPO CERCANO')",
+          "motion_direction": "double(payload.rssi) \u003e= 55.0 ? 'ON_SURFACE' : (double(payload.rssi) \u003e= 50.0 ? 'NEAR_PROXIMITY' : 'FAR_FIELD')",
+          "previous_rssi_dbm": "double(payload.rssi)",
+          "reader_id": "string(payload.reader_id)",
+          "serial_number": "'12779363114'",
+          "standard": "'SGTIN-96'",
+          "timestamp": "has(payload.timestamp) ? string(payload.timestamp) : '2026-11-12T20:30:00Z'"
+        },
+        "cron": ""
+      },
+      {
+        "reactor_id": "rfid_on_surface_translation_dispatcher",
+        "input_message_type": "TagRadialMotion",
+        "output_message_type": "RfidAlertTranslationRequest",
+        "context_query": "",
+        "trigger_condition": "has(payload.motion_direction) \u0026\u0026 payload.motion_direction == 'ON_SURFACE'",
+        "transformation_expression": {
+          "epc_hex": "string(payload.epc_hex)",
+          "gtin14": "string(payload.gtin14)",
+          "language": "'VAL'",
+          "message": "'🎯 ¡Tag posado en antena Keonn Advan-CP1!\\n• GTIN-14: ' + string(payload.gtin14) + '\\n• Serial: ' + string(payload.serial_number) + '\\n• EPC: ' + string(payload.epc_hex) + '\\n• RSSI: ' + string(payload.current_rssi_dbm) + ' dBm\\n• Distancia: ' + string(payload.estimated_distance_m) + ' m\\n• Lector MAC: ' + string(payload.device_mac)",
+          "phone_number": "'all'",
+          "reader_mac": "string(payload.device_mac)",
+          "rssi": "double(payload.current_rssi_dbm)",
+          "serial_number": "string(payload.serial_number)",
+          "timestamp": "has(payload.timestamp) ? string(payload.timestamp) : '2026-11-13T12:35:00Z'"
+        },
+        "cron": ""
+      }
+    ],
+    "semantic_ai_reactors": [
+      {
+        "reactor_id": "rfid-ai-copilot-auditor",
+        "api_endpoint": "http://localhost:11434/v1/chat/completions",
+        "api_key_secret": "ollama-local",
+        "model_id": "qwen2.5:1.5b",
+        "max_concurrency": 1,
+        "trigger_message_types": [
+          "RfidAlertTranslationRequest"
+        ],
+        "history_count": 0,
+        "context_query": "",
+        "response_message_type": "SendWhatsAppRequest",
+        "confidence_threshold": 0.7,
+        "mapping_template": {
+          "epc_hex": "string(payload.epc_hex)",
+          "gtin14": "string(payload.gtin14)",
+          "message_text": "has(resp.translated_message) \u0026\u0026 string(resp.translated_message) != '' ? string(resp.translated_message) : (has(resp.message_text) \u0026\u0026 string(resp.message_text) != '' ? string(resp.message_text) : string(payload.message))",
+          "phone_number": "string(payload.phone_number)",
+          "reader_mac": "string(payload.reader_mac)",
+          "rssi": "double(payload.rssi)",
+          "serial_number": "string(payload.serial_number)",
+          "timestamp": "has(payload.timestamp) ? string(payload.timestamp) : \"2026-11-13T12:35:00Z\""
+        },
+        "system_instruction": "Eres un traductor profesional de alertas RFID para mensajería instantánea. Recibes: mensaje a enviar, teléfono e idioma. Si el idioma especificado no está vacío (ej: VAL, IT, EN, ES), traduce OBLIGATORIAMENTE a ese idioma. Solo si el idioma está vacío, usa el prefijo del teléfono (+34/+41 -\u003e ES, +39 -\u003e IT, +44/+1 -\u003e EN). Para VAL o Valenciano, traduce al valenciano ('🎯 Tag posat en antena Keonn Advan-CP1!', 'Distància'). Conserva viñetas (•) y datos numéricos. Devuelve exclusivamente un JSON estricto sin markdown.",
+        "semantic_prompt_template": "Teléfono: {{index .trigger_event \"fields\" \"phone_number\"}}\nIdioma: {{index .trigger_event \"fields\" \"language\"}}\nMensaje original:\n\"{{index .trigger_event \"fields\" \"message\"}}\"\n\nInstrucciones:\n1. Si el campo Idioma contiene un idioma especificado (ej: VAL, IT, EN), traduce OBLIGATORIAMENTE a ese idioma. Solo si Idioma está vacío usas el prefijo del teléfono.\n2. Si el idioma es VAL (Valenciano): traduce el texto al valenciano (🎯 Tag posat en antena Keonn Advan-CP1! y Distància).\n3. Devuelve estrictamente el JSON sin markdown:\n{\n  \"target_language\": \"{{index .trigger_event \"fields\" \"language\"}}\",\n  \"translated_message\": \"🎯 Tag posat en antena Keonn Advan-CP1!\\n• GTIN-14: {{index .trigger_event \"fields\" \"gtin14\"}}\\n• Serial: {{index .trigger_event \"fields\" \"serial_number\"}}\\n• EPC: {{index .trigger_event \"fields\" \"epc_hex\"}}\\n• RSSI: {{index .trigger_event \"fields\" \"rssi\"}} dBm\\n• Distància: 0.01 m\\n• Lector MAC: {{index .trigger_event \"fields\" \"reader_mac\"}}\"\n}",
+        "trigger_condition": "",
+        "inference_timeout": 60,
+        "cron": ""
+      }
+    ],
+    "plugins": [
+      "bindu-idx4000-plugin@1.0.0",
+      "bindu-whatsapp-plugin@1.0.0"
+    ]
+  }
+}

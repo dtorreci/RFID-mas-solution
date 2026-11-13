@@ -1,0 +1,16 @@
+{
+  "id": "bindu-idx4000-plugin",
+  "name": "Sensormatic IDX-4000 Native RFID Edge Controller",
+  "version": "1.0.0",
+  "runtime": "bpr",
+  "in": [
+    "RfidReaderConfig"
+  ],
+  "out": [
+    "RawTagRead"
+  ],
+  "capabilities": [
+    "publish",
+    "subscribe"
+  ]
+}

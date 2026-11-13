@@ -1,0 +1,14 @@
+{
+  "pluginId": "bindu-idx4000-plugin",
+  "version": "1.0.0",
+  "timestamp": "2026-11-13T09:24:51Z",
+  "status": "ok",
+  "checksums": {
+    "attestations/preflight.json": "2deb3a59adf303f667403fbdc7016af09d83066bf5c4c627e86a727f55a3cbc4",
+    "bundle": "67bd4f6390685af10fd035f3927cb8e124bd1cef59a7ec718d7f4866f3d7c190",
+    "manifest.json": "a84519285d2f97d478e826dea6335ee3c78a2df14130b2119247562f65365e63",
+    "sha256sums.txt": "cda7412b7b5b7787fca2edbf41c7686c416b6a924d8e5a7a59ffdc33b1dbd7ad"
+  },
+  "bundlePath": "/home/dtp/solutions/RFID-mas-solution/bindu-idx4000-plugin.tar.gz",
+  "dryRun": false
+}

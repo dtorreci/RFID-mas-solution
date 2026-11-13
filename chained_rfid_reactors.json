@@ -1,0 +1,79 @@
+{
+  "$type": "CELReactorSet",
+  "$node-dest": "root",
+  "$group": "mesh",
+  "$producer": "root",
+  "$user": "operator",
+  "$when": "2026-11-12T22:10:00Z",
+  "fields": {
+    "gateway_node_id": "root",
+    "reactors": [
+      {
+        "reactor_id": "idx4000_raw_rfid_normalizer",
+        "input_message_type": "RawIngressEvent",
+        "cron": "",
+        "trigger_condition": "payload.subpath.startsWith('rfid/idx4000') && payload.content_type == 'json' && has(payload.payload.epc)",
+        "context_query": "",
+        "output_message_type": "RawTagRead",
+        "transformation_expression": {
+          "epc": "string(payload.payload.epc)",
+          "device_mac": "has(payload.payload.mac) ? string(payload.payload.mac) : '00:50:f9:d1:0a:2b'",
+          "reader_id": "has(payload.payload.reader_id) ? string(payload.payload.reader_id) : 'idx4000-d10a2b'",
+          "antenna": "int(payload.payload.antenna)",
+          "rssi": "double(payload.payload.rssi)",
+          "read_count": "has(payload.payload.read_count) ? int(payload.payload.read_count) : 1",
+          "reader_vendor": "'Sensormatic'",
+          "dock_portal": "string(payload.subpath)",
+          "timestamp": "has(payload.payload.timestamp) ? string(payload.payload.timestamp) : '2026-11-12T20:30:00Z'"
+        }
+      },
+      {
+        "reactor_id": "rfid_kinematic_proximity_guard",
+        "input_message_type": "RawTagRead",
+        "cron": "",
+        "trigger_condition": "has(payload.epc) && size(string(payload.epc)) > 0",
+        "context_query": "",
+        "output_message_type": "TagRadialMotion",
+        "transformation_expression": {
+          "epc_hex": "string(payload.epc)",
+          "device_mac": "string(payload.device_mac)",
+          "reader_id": "string(payload.reader_id)",
+          "antenna_id": "int(payload.antenna)",
+          "antenna_model": "'Keonn Advan-CP1 EU'",
+          "standard": "'SGTIN-96'",
+          "gtin14": "'07621806175810'",
+          "serial_number": "'12779363114'",
+          "current_rssi_dbm": "double(payload.rssi)",
+          "previous_rssi_dbm": "double(payload.rssi)",
+          "delta_rssi_dbm": "0.0",
+          "motion_direction": "double(payload.rssi) >= 55.0 ? 'ON_SURFACE' : (double(payload.rssi) >= 50.0 ? 'NEAR_PROXIMITY' : 'FAR_FIELD')",
+          "estimated_distance_m": "double(payload.rssi) >= 55.0 ? 0.01 : (double(payload.rssi) >= 50.0 ? 0.01 + (55.0 - double(payload.rssi)) * 0.014 : (double(payload.rssi) >= 42.0 ? 0.08 + (50.0 - double(payload.rssi)) * 0.025 : 0.28 + (42.0 - double(payload.rssi)) * 0.045))",
+          "distance_correction_margin_m": "double(payload.rssi) >= 55.0 ? 0.01 : (double(payload.rssi) >= 50.0 ? 0.02 : 0.05)",
+          "distance_confidence_zone": "double(payload.rssi) >= 55.0 ? 'ON_ANTENNA_SURFACE' : (double(payload.rssi) >= 50.0 ? 'IMMEDIATE_PROXIMITY' : (double(payload.rssi) >= 42.0 ? 'NEAR_FIELD_ZONE' : 'MID_TRANSIT_ZONE'))",
+          "dwell_channel": "1",
+          "motion_description": "double(payload.rssi) >= 55.0 ? 'Tag literalmente POSADO sobre la antena Keonn (Contacto F\u00edsico)' : (double(payload.rssi) >= 50.0 ? 'Tag en PROXIMIDAD INMEDIATA (2-5 cm)' : 'Tag en CAMPO CERCANO')",
+          "timestamp": "has(payload.timestamp) ? string(payload.timestamp) : '2026-11-12T20:30:00Z'"
+        }
+      },
+      {
+        "reactor_id": "rfid_on_surface_translation_dispatcher",
+        "input_message_type": "TagRadialMotion",
+        "cron": "",
+        "trigger_condition": "has(payload.motion_direction) && payload.motion_direction == 'ON_SURFACE'",
+        "context_query": "",
+        "output_message_type": "RfidAlertTranslationRequest",
+        "transformation_expression": {
+          "phone_number": "'all'",
+          "language": "'VAL'",
+          "message": "'🎯 ¡Tag posado en antena Keonn Advan-CP1!\\n• GTIN-14: ' + string(payload.gtin14) + '\\n• Serial: ' + string(payload.serial_number) + '\\n• EPC: ' + string(payload.epc_hex) + '\\n• RSSI: ' + string(payload.current_rssi_dbm) + ' dBm\\n• Distancia: ' + string(payload.estimated_distance_m) + ' m\\n• Lector MAC: ' + string(payload.device_mac)",
+          "epc_hex": "string(payload.epc_hex)",
+          "gtin14": "string(payload.gtin14)",
+          "serial_number": "string(payload.serial_number)",
+          "rssi": "double(payload.current_rssi_dbm)",
+          "reader_mac": "string(payload.device_mac)",
+          "timestamp": "has(payload.timestamp) ? string(payload.timestamp) : '2026-11-13T12:35:00Z'"
+        }
+      }
+    ]
+  }
+}

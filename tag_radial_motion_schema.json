@@ -1,0 +1,111 @@
+{
+  "name": "TagRadialMotion",
+  "description": "Evento cinemático que indica si un tag RFID se acerca o se aleja respecto a una antena específica (Keonn Advan-CP1) con estimación de distancia métrica y margen de corrección",
+  "emoji": "📡",
+  "version": "1.1.0",
+  "persist": true,
+  "retentionMode": "count",
+  "retentionValue": 100,
+  "routing": [
+    "local",
+    "parent"
+  ],
+  "properties": [
+    {
+      "name": "epc_hex",
+      "type": "string",
+      "required": true,
+      "description": "Código EPC en hexadecimal de 24 caracteres"
+    },
+    {
+      "name": "standard",
+      "type": "string",
+      "required": true,
+      "description": "Estándar EPC (SGTIN-96, GID-96, etc.)"
+    },
+    {
+      "name": "antenna_id",
+      "type": "integer",
+      "required": true,
+      "description": "Puerto físico de antena donde se detectó el tag"
+    },
+    {
+      "name": "antenna_model",
+      "type": "string",
+      "required": true,
+      "description": "Modelo de la antena (Keonn Advan-CP1 EU)"
+    },
+    {
+      "name": "motion_direction",
+      "type": "string",
+      "required": true,
+      "description": "Dirección cinemática calculada: APPROACHING, RECEDING, STATIONARY, FIRST_SEEN"
+    },
+    {
+      "name": "estimated_distance_m",
+      "type": "number",
+      "required": true,
+      "description": "Distancia radial estimada en metros a la antena Keonn Advan-CP1 (modelo radar backscatter)"
+    },
+    {
+      "name": "distance_correction_margin_m",
+      "type": "number",
+      "required": true,
+      "description": "Margen de posible corrección en metros (+/- m) por desajuste angular de polarización y reflexiones multipath"
+    },
+    {
+      "name": "distance_confidence_zone",
+      "type": "string",
+      "required": true,
+      "description": "Nivel de confianza métrico: NEAR_FIELD_HIGH (<0.35m, +/-0.05m), MID_TRANSIT_NOMINAL (0.35-0.80m, +/-0.12m), FAR_FIELD_UNCERTAIN (>0.80m, +/-0.25m)"
+    },
+    {
+      "name": "current_rssi_dbm",
+      "type": "number",
+      "required": true,
+      "description": "Potencia recibida actual en dBm"
+    },
+    {
+      "name": "previous_rssi_dbm",
+      "type": "number",
+      "required": true,
+      "description": "Potencia recibida en la lectura anterior del mismo tag"
+    },
+    {
+      "name": "delta_rssi_dbm",
+      "type": "number",
+      "required": true,
+      "description": "Gradiente de potencia: RSSI_actual - RSSI_anterior"
+    },
+    {
+      "name": "dwell_channel",
+      "type": "integer",
+      "required": false,
+      "description": "Canal de frecuencia RF del salto"
+    },
+    {
+      "name": "gtin14",
+      "type": "string",
+      "required": false,
+      "description": "GTIN-14 decodificado si es SGTIN-96"
+    },
+    {
+      "name": "serial_number",
+      "type": "string",
+      "required": false,
+      "description": "Número de serie del producto"
+    },
+    {
+      "name": "motion_description",
+      "type": "string",
+      "required": true,
+      "description": "Descripción semántica del movimiento detectado"
+    },
+    {
+      "name": "timestamp",
+      "type": "string",
+      "required": true,
+      "description": "Marca de tiempo UTC del evento"
+    }
+  ]
+}

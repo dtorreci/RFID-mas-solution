@@ -1,0 +1,65 @@
+{
+  "$type": "CELReactorSet",
+  "$node-dest": "root",
+  "$group": "mesh",
+  "$producer": "root",
+  "$user": "operator",
+  "$when": "2026-11-12T15:00:00Z",
+  "fields": {
+    "gateway_node_id": "root",
+    "reactors": [
+      {
+        "reactor_id": "keonn-advan-cp1-sgtin-radial-motion-tracker",
+        "input_message_type": "EpcSgtinRead",
+        "cron": "",
+        "trigger_condition": "has(payload.peak_rssi_dbm) && double(payload.peak_rssi_dbm) >= -80.0",
+        "context_query": "SELECT CAST(json_extract(fields, '$.current_rssi_dbm') AS REAL) as prev_rssi, json_extract(fields, '$.timestamp') as prev_time, json_extract(fields, '$.dwell_channel') as prev_channel FROM v_messages WHERE \"$type\" = 'TagRadialMotion' AND json_extract(fields, '$.epc_hex') = '30b5d132b8112b42f9b59b2a' AND json_extract(fields, '$.antenna_id') = 1 ORDER BY \"$arriveTime\" DESC LIMIT 1",
+        "output_message_type": "TagRadialMotion",
+        "transformation_expression": {
+          "epc_hex": "string(payload.epc_hex)",
+          "standard": "'SGTIN-96'",
+          "antenna_id": "int(payload.antenna_id)",
+          "antenna_model": "'Keonn Advan-CP1 EU'",
+          "motion_direction": "!has(db.rows) || size(db.rows) == 0 ? 'FIRST_SEEN' : (double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) >= 1.5 ? 'APPROACHING' : (double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) <= -1.5 ? 'RECEDING' : 'STATIONARY'))",
+          "estimated_distance_m": "double(payload.peak_rssi_dbm) >= 73.0 ? 0.01 : (double(payload.peak_rssi_dbm) >= 68.0 ? 0.01 + (73.0 - double(payload.peak_rssi_dbm)) * 0.014 : (double(payload.peak_rssi_dbm) >= 60.0 ? 0.08 + (68.0 - double(payload.peak_rssi_dbm)) * 0.025 : (double(payload.peak_rssi_dbm) >= 52.0 ? 0.28 + (60.0 - double(payload.peak_rssi_dbm)) * 0.045 : (double(payload.peak_rssi_dbm) >= 45.0 ? 0.64 + (52.0 - double(payload.peak_rssi_dbm)) * 0.080 : 1.20 + (45.0 - double(payload.peak_rssi_dbm)) * 0.120))))",
+          "distance_correction_margin_m": "double(payload.peak_rssi_dbm) >= 73.0 ? 0.01 : (double(payload.peak_rssi_dbm) >= 68.0 ? 0.02 : (double(payload.peak_rssi_dbm) >= 60.0 ? 0.05 : (double(payload.peak_rssi_dbm) >= 52.0 ? 0.10 : (double(payload.peak_rssi_dbm) >= 45.0 ? 0.20 : 0.35))))",
+          "distance_confidence_zone": "double(payload.peak_rssi_dbm) >= 73.0 ? 'ON_ANTENNA_SURFACE' : (double(payload.peak_rssi_dbm) >= 68.0 ? 'IMMEDIATE_PROXIMITY' : (double(payload.peak_rssi_dbm) >= 60.0 ? 'NEAR_FIELD_ZONE' : (double(payload.peak_rssi_dbm) >= 48.0 ? 'MID_TRANSIT_ZONE' : 'FAR_FIELD_ZONE')))",
+          "current_rssi_dbm": "double(payload.peak_rssi_dbm)",
+          "previous_rssi_dbm": "has(db.rows) && size(db.rows) > 0 ? double(db.rows[0].fields.prev_rssi) : double(payload.peak_rssi_dbm)",
+          "delta_rssi_dbm": "has(db.rows) && size(db.rows) > 0 ? double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) : 0.0",
+          "dwell_channel": "int(payload.channel_index)",
+          "gtin14": "has(payload.gtin14) ? string(payload.gtin14) : ''",
+          "serial_number": "has(payload.serial_number) ? string(payload.serial_number) : ''",
+          "motion_description": "!has(db.rows) || size(db.rows) == 0 ? 'Tag detectado por primera vez en lóbulo Keonn Advan-CP1' : (double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) >= 1.5 ? 'Tag ACERCÁNDOSE a la antena Keonn (+ΔRSSI significativo)' : (double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) <= -1.5 ? 'Tag ALEJÁNDOSE de la antena Keonn (-ΔRSSI significativo)' : 'Tag en posición ESTACIONARIA en el lóbulo'))",
+          "timestamp": "string(payload.first_seen_utc)"
+        }
+      },
+      {
+        "reactor_id": "keonn-advan-cp1-generic-radial-motion-tracker",
+        "input_message_type": "EpcGidRead",
+        "cron": "",
+        "trigger_condition": "has(payload.peak_rssi_dbm) && double(payload.peak_rssi_dbm) >= -80.0",
+        "context_query": "SELECT CAST(json_extract(fields, '$.peak_rssi_dbm') AS REAL) as prev_rssi, json_extract(fields, '$.first_seen_utc') as prev_time FROM v_messages WHERE \"$type\" = 'EpcGidRead' AND json_extract(fields, '$.epc_hex') = :payload.epc_hex AND CAST(json_extract(fields, '$.antenna_id') AS TEXT) = :payload.antenna_id ORDER BY \"$arriveTime\" DESC LIMIT 1 OFFSET 1",
+        "output_message_type": "TagRadialMotion",
+        "transformation_expression": {
+          "epc_hex": "string(payload.epc_hex)",
+          "standard": "'GID-96'",
+          "antenna_id": "int(payload.antenna_id)",
+          "antenna_model": "'Keonn Advan-CP1 EU'",
+          "motion_direction": "!has(db.rows) || size(db.rows) == 0 ? 'FIRST_SEEN' : (double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) >= 1.5 ? 'APPROACHING' : (double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) <= -1.5 ? 'RECEDING' : 'STATIONARY'))",
+          "estimated_distance_m": "double(payload.peak_rssi_dbm) >= 73.0 ? 0.01 : (double(payload.peak_rssi_dbm) >= 68.0 ? 0.01 + (73.0 - double(payload.peak_rssi_dbm)) * 0.014 : (double(payload.peak_rssi_dbm) >= 60.0 ? 0.08 + (68.0 - double(payload.peak_rssi_dbm)) * 0.025 : (double(payload.peak_rssi_dbm) >= 52.0 ? 0.28 + (60.0 - double(payload.peak_rssi_dbm)) * 0.045 : (double(payload.peak_rssi_dbm) >= 45.0 ? 0.64 + (52.0 - double(payload.peak_rssi_dbm)) * 0.080 : 1.20 + (45.0 - double(payload.peak_rssi_dbm)) * 0.120))))",
+          "distance_correction_margin_m": "double(payload.peak_rssi_dbm) >= 73.0 ? 0.01 : (double(payload.peak_rssi_dbm) >= 68.0 ? 0.02 : (double(payload.peak_rssi_dbm) >= 60.0 ? 0.05 : (double(payload.peak_rssi_dbm) >= 52.0 ? 0.10 : (double(payload.peak_rssi_dbm) >= 45.0 ? 0.20 : 0.35))))",
+          "distance_confidence_zone": "double(payload.peak_rssi_dbm) >= 73.0 ? 'ON_ANTENNA_SURFACE' : (double(payload.peak_rssi_dbm) >= 68.0 ? 'IMMEDIATE_PROXIMITY' : (double(payload.peak_rssi_dbm) >= 60.0 ? 'NEAR_FIELD_ZONE' : (double(payload.peak_rssi_dbm) >= 48.0 ? 'MID_TRANSIT_ZONE' : 'FAR_FIELD_ZONE')))",
+          "current_rssi_dbm": "double(payload.peak_rssi_dbm)",
+          "previous_rssi_dbm": "has(db.rows) && size(db.rows) > 0 ? double(db.rows[0].fields.prev_rssi) : double(payload.peak_rssi_dbm)",
+          "delta_rssi_dbm": "has(db.rows) && size(db.rows) > 0 ? double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) : 0.0",
+          "dwell_channel": "int(payload.channel_index)",
+          "gtin14": "''",
+          "serial_number": "''",
+          "motion_description": "!has(db.rows) || size(db.rows) == 0 ? 'Tag GID detectado por primera vez en lóbulo Keonn Advan-CP1' : (double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) >= 1.5 ? 'Tag ACERCÁNDOSE a la antena Keonn (+ΔRSSI)' : (double(payload.peak_rssi_dbm) - double(db.rows[0].fields.prev_rssi) <= -1.5 ? 'Tag ALEJÁNDOSE de la antena Keonn (-ΔRSSI)' : 'Tag en posición ESTACIONARIA'))",
+          "timestamp": "string(payload.first_seen_utc)"
+        }
+      }
+    ]
+  }
+}

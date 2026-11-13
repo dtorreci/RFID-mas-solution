@@ -1,0 +1,20 @@
+{
+  "$group": "defaultGroup",
+  "$node-dest": "/",
+  "$node-origin": "/",
+  "$producer": "exampleProducer",
+  "$type": "SendWhatsAppResult",
+  "$user": "exampleUser",
+  "$when": "2026-11-12T20:58:54Z",
+  "$where": {
+    "locagram": "/"
+  },
+  "fields": {
+    "epc_hex": "",
+    "error_message": "",
+    "message_id": "",
+    "phone_number": "+1-555-0100",
+    "status": "",
+    "timestamp": "2026-11-12T20:58:54Z"
+  }
+}

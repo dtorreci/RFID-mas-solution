@@ -1,0 +1,22 @@
+{
+  "$group": "defaultGroup",
+  "$node-dest": "/",
+  "$node-origin": "/",
+  "$producer": "exampleProducer",
+  "$type": "SendWhatsAppRequest",
+  "$user": "exampleUser",
+  "$when": "2026-11-12T20:58:54Z",
+  "$where": {
+    "locagram": "/"
+  },
+  "fields": {
+    "epc_hex": "",
+    "gtin14": "",
+    "message_text": "",
+    "phone_number": "+1-555-0100",
+    "reader_mac": "",
+    "rssi": 0,
+    "serial_number": "",
+    "timestamp": "2026-11-12T20:58:54Z"
+  }
+}

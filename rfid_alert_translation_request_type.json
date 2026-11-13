@@ -1,0 +1,72 @@
+{
+  "message_types": [
+    {
+      "description": "Solicitud de traducción de alerta RFID generada por CEL hacia el Semantic AI Reactor",
+      "emoji": "🌐",
+      "name": "RfidAlertTranslationRequest",
+      "persist": true,
+      "properties": [
+        {
+          "name": "phone_number",
+          "description": "Teléfono internacional del destinatario",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "language",
+          "description": "Idioma explícito del destinatario (ej: ES, IT, EN) o vacío para deducir por prefijo",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "description": "Mensaje original base a traducir",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "epc_hex",
+          "description": "EPC en hexadecimal",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "gtin14",
+          "description": "GTIN-14 del activo",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "serial_number",
+          "description": "Número de serie",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "rssi",
+          "description": "Potencia recibida en dBm",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "name": "reader_mac",
+          "description": "Dirección MAC del lector",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "description": "Marca de tiempo UTC",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "retentionMode": "count",
+      "retentionValue": 50,
+      "routing": [
+        "local"
+      ],
+      "version": "1.0.0"
+    }
+  ]
+}
