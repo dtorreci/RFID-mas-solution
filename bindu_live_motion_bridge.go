@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	ReaderAddr   = "192.168.1.86:5084"
+	ReaderAddr   = "192.168.1.143:5084"
 	TargetGTIN   = "07621806175810"
 	MqttBroker   = "127.0.0.1:1883"
 	MqttUser     = ""
@@ -54,7 +54,7 @@ func main() {
 	fmt.Println("✔ Conectado y autenticado.")
 
 	// 2. Conexión LLRP al lector R2000
-	fmt.Print("2. Conectando al lector R2000 (192.168.1.86:5084 LLRP)... ")
+	fmt.Print("2. Conectando al lector R2000 (192.168.1.143:5084 LLRP)... ")
 	rConn, err := net.DialTimeout("tcp", ReaderAddr, 5*time.Second)
 	if err != nil {
 		fmt.Printf("\n❌ Error conectando a lector RFID: %v\n", err)

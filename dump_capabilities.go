@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	conn, err := net.DialTimeout("tcp", "192.168.1.86:5084", 5*time.Second)
+	conn, err := net.DialTimeout("tcp", "192.168.1.143:5084", 5*time.Second)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return

@@ -25,7 +25,7 @@ const (
 )
 
 func main() {
-	target := "192.168.1.86:5084"
+	target := "192.168.1.143:5084"
 	fmt.Printf("Conectando a %s para prueba de ROSpec...\n", target)
 
 	conn, err := net.DialTimeout("tcp", target, 5*time.Second)
@@ -269,7 +269,7 @@ import (
 )
 
 func main() {
-	conn, err := net.DialTimeout("tcp", "192.168.1.86:5084", 5*time.Second)
+	conn, err := net.DialTimeout("tcp", "192.168.1.143:5084", 5*time.Second)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return

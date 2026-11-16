@@ -32,7 +32,7 @@ var clientKeyPEM []byte
 
 const (
 	DefaultLLRPAddr = "127.0.0.1:5084"
-	DefaultMQTTAddr = "192.168.1.75:1883"
+	DefaultMQTTAddr = "192.168.1.111:1883"
 	TargetGTIN      = "07621806175810"
 	TargetEPCHex    = "30b5d132b8112b42f9b59b2a"
 	TargetSerial    = "12779363114"
@@ -98,8 +98,8 @@ func getMacAddress() string {
 func main() {
 	llrpAddr := flag.String("llrp", DefaultLLRPAddr, "LLRP reader address (host:port)")
 	mqttAddr := flag.String("mqtt", DefaultMQTTAddr, "Bindu MQTT broker address (host:port)")
-	user := flag.String("user", "", "MQTT username")
-	pass := flag.String("pass", "", "MQTT password")
+	user := flag.String("user", "dtorreci", "MQTT username")
+	pass := flag.String("pass", "BinduMaster2026!", "MQTT password")
 	ant := flag.Int("ant", 0, "Antenna port (0=all antennas, 1-4)")
 	power := flag.Int("power", 18, "Transmit power in dBm (default: 18 dBm)")
 	allTags := flag.Bool("all-tags", true, "Publish all tags (false=filter target EPC only)")

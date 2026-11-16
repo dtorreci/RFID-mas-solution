@@ -25,7 +25,7 @@ type DecodedTagEvent struct {
 }
 
 func main() {
-	target := "192.168.1.86:5084"
+	target := "192.168.1.143:5084"
 	fmt.Printf("=== Iniciando Ingesta en Vivo desde Lector R2000 (%s) ===\n", target)
 
 	conn, err := net.DialTimeout("tcp", target, 5*time.Second)

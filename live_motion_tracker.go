@@ -41,7 +41,7 @@ const (
 )
 
 func main() {
-	target := "192.168.1.86:5084"
+	target := "192.168.1.143:5084"
 	fmt.Println("=========================================================================================")
 	fmt.Printf("   📡 RASTREADOR CINEMÁTICO EN VIVO — Antena Keonn Advan-CP1 EU (%s)\n", target)
 	fmt.Printf("   🎯 TAG OBJETIVO: %s (Filtro activo de strays)\n", TargetGTIN)

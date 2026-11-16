@@ -16,7 +16,7 @@ flowchart TB
     %% ========================================================
     subgraph ROW1["FASE 1: BORDE FÍSICO (NODO EDGE) & CANAL MESH"]
         direction LR
-        subgraph S1["📍 EN ENTORNO FÍSICO & LECTOR<br/>(Sensormatic IDX-4000 @ 192.168.1.86)"]
+        subgraph S1["📍 EN ENTORNO FÍSICO & LECTOR<br/>(Sensormatic IDX-4000 @ 192.168.1.143)"]
             TAG["🏷️ Tag RFID SGTIN-96<br/>GTIN-14: 07621806175810<br/>EPC: 30b5d132b8112b42f9b59b2a"]
             ANT["📡 Antena Keonn Advan-CP1 EU<br/>(Campo Cercano - Puerto RF 1)"]
             LLRP["⚙️ ireader LLRP Daemon<br/>(Loopback 127.0.0.1:5084)"]
@@ -33,7 +33,7 @@ flowchart TB
 
         subgraph S3["📍 EN CANAL MESH DISTRIBUIDO<br/>(mTLS Autenticado 1883)"]
             MESH["🔒 Túnel Mesh mTLS Cifrado<br/>Zero Conexiones Directas MQTT"]
-            ROOT_ENTRY["🏢 bindu-root Listener<br/>(Puerto 1883 / 192.168.1.75)"]
+            ROOT_ENTRY["🏢 bindu-root Listener<br/>(Puerto 1883 / 192.168.1.111)"]
             
             MESH --> ROOT_ENTRY
         end
@@ -125,11 +125,11 @@ flowchart TB
 | **`bindu-idx4000-plugin`** | Plugin BPR supervisor de telemetría LLRP | **`NODE`** (Lector Sensormatic IDX-4000) | `bin/armv7/plugin` | BPR Stdio Pipes (`stdin`/`stdout`) |
 | **`bindu-node`** | Agente de borde Bindu con Strong Identity | **`NODE`** (Lector Sensormatic IDX-4000) | `/home/dtp/.bindu/node/bindu-node` | mTLS Mesh hacia `ROOT:1883` |
 | **Canal Mesh mTLS** | Túnel seguro de datos de la malla | **`RED MESH`** (`node` $\leftrightarrow$ `root`) | Puerto TCP `1883` (mTLS mutuo) | Protocolo binario Bindu Mesh (Zero-MQTT) |
-| **`bindu-root`** | Gateway orquestador central y ledger SQLite | **`ROOT`** (Servidor Gateway `192.168.1.75`) | `/home/dtp/.bindu/root/bindu-root` | SQLite `bindu_messages.db`, Consola 8080 |
+| **`bindu-root`** | Gateway orquestador central y ledger SQLite | **`ROOT`** (Servidor Gateway `192.168.1.111`) | `/home/dtp/.bindu/root/bindu-root` | SQLite `bindu_messages.db`, Consola 8080 |
 | **Pipeline Google CEL** | Inferencia cinemática determinista (< 1 ms) | **`ROOT`** (In-memory en daemon `bindu-root`) | `CELReactorPlugin` (in-process) | Google CEL (`RawTagRead` $\to$ `TagRadialMotion`) |
 | **Semantic AI Reactor** | Adaptador y validador del contrato de IA | **`ROOT`** (In-memory en daemon `bindu-root`) | `SemanticReactorAdapter` (in-process) | Coerción de esquema `SendWhatsAppRequest` |
-| **Ollama SLM Local** | Inferencia de lenguaje natural (`qwen2.5:1.5b`) | **`ROOT`** (Servidor Gateway `192.168.1.75`) | Demonio local `ollama serve` | HTTP REST `http://localhost:11434/v1` |
-| **`bindu-whatsapp-plugin`** | Despacho a WhatsApp y control anti-spam | **`ROOT`** (Servidor Gateway `192.168.1.75`) | Plugin BPR supervisado por `bindu-root` | BPR Stdio Pipes + whatsmeow WebSockets |
+| **Ollama SLM Local** | Inferencia de lenguaje natural (`qwen2.5:1.5b`) | **`ROOT`** (Servidor Gateway `192.168.1.111`) | Demonio local `ollama serve` | HTTP REST `http://localhost:11434/v1` |
+| **`bindu-whatsapp-plugin`** | Despacho a WhatsApp y control anti-spam | **`ROOT`** (Servidor Gateway `192.168.1.111`) | Plugin BPR supervisado por `bindu-root` | BPR Stdio Pipes + whatsmeow WebSockets |
 | **Red WhatsApp Web** | Entrega móvil a los smartphones | **`EXTERNO`** (Infraestructura Meta) | Servidores de WhatsApp $\to$ App Móvil | Protocolo Noise / Signal E2EE |
 
 ---
@@ -137,9 +137,12 @@ flowchart TB
 ## 🧩 2. Desglose Detallado de Componentes
 
 ### 2.1. Nodo Bindu Edge en Sensormatic IDX-4000
-- **Hardware & SO**: Procesador Freescale i.MX6 Dual/Quad (ARMv7 32-bit), Linux 5.15 LTS, lector RFID de 4 puertos RF Sensormatic IDX-4000 (192.168.1.86).
+- **Hardware & SO**: Procesador Freescale i.MX6 Dual/Quad (ARMv7 Cortex-A7 32-bit), Linux 5.15 LTS, lector RFID de 4 puertos RF Sensormatic IDX-4000 (`192.168.1.143`).
 - **Strong Identity (`idx4000-00-50-f9-d1-0a-2b`)**: Identidad criptográfica vinculada a la dirección MAC física del adaptador Ethernet `eth0` (`00:50:f9:d1:0a:2b`). Resuelve de raíz problemas de asignación dinámica de IPs y garantiza que las claves mTLS del nodo no colisionen en la malla.
-- **Plugin BPR (`bindu-idx4000-plugin`)**: Binario supervisor ejecutado localmente por `bindu-node` mediante pipes IPC (`stdin`/`stdout`). Se conecta a través de loopback TCP (`127.0.0.1:5084`) al demonio nativo `ireader` (LLRP).
+- **Autoarranque Nativo como `customer_app`**:
+  - Binario estático compilado en ARMv7: [edge_agent/idx4000_edge_agent](file:///home/dtp/solutions/RFID-mas-solution/edge_agent/idx4000_edge_agent).
+  - Wrapper supervisor en `/customer_apps/customerApp` integrado en el ciclo de inicio del firmware del lector: se levanta automáticamente tras el arranque del kernel Linux 5.15, conecta por loopback TCP al demonio nativo `ireader` (LLRP `127.0.0.1:5084`), configura la ROSpec de 18 dBm en la antena 1 (Keonn Advan-CP1 EU) y establece el túnel mTLS autenticado con Bindu Root (`192.168.1.111:1883`).
+  - Supervisor resiliente: cuenta con un bucle `while true` que reconecta y reinicia el agente ante cualquier interrupción sin requerir reiniciar el lector.
 - **Zero Conexiones Directas a MQTT**: No existe ningún broker MQTT expuesto ni clientes conectándose directamente por fuera de la malla. Toda la información viaja por el protocolo seguro interno de Bindu.
 
 ### 2.2. Pipeline Determinista Google CEL (In-Memory en Root)
@@ -173,7 +176,11 @@ Configurado en [rfid_ai_semantic_reactor.json](file:///home/dtp/solutions/RFID-m
 Implementado en [bindu-whatsapp-plugin/main.go](file:///home/dtp/solutions/RFID-mas-solution/bindu-whatsapp-plugin/main.go):
 
 - **Desacoplamiento Total:** Se ha eliminado la función rígida `formatAlertMessage`. El plugin actúa exclusivamente como un adaptador de transporte de red para WhatsApp Web, inyectando directamente el `message_text` procesado por el reactor de IA.
-- **Libreta Dinámica ([recipients.txt](file:///home/dtp/solutions/RFID-mas-solution/bindu-whatsapp-plugin/recipients.txt)):** Recarga en caliente los contactos comparando el `ModTime` del fichero en disco sin necesidad de reiniciar el proceso.
+- **FileWatcher Reactivo con `sync.RWMutex` ([recipients.txt](file:///home/dtp/solutions/RFID-mas-solution/bindu-whatsapp-plugin/recipients.txt)):**
+  - Incorpora una goroutine vigilante continua que monitorea el archivo en tiempo real cada 1 segundo (con debounce de 100 ms para escrituras atómicas).
+  - Al detectar cualquier modificación en disco (añadir número, comentar con `#`, cambiar de teléfono), adquiere un lock de escritura (`contactsMu.Lock()`), relee el fichero y actualiza la memoria del BPR en caliente.
+  - El handler de eventos (`OnEvent`) utiliza bloqueos de lectura (`contactsMu.RLock()`), garantizando cero condiciones de carrera (*thread-safety* estricto) sin reiniciar el plugin ni interrumpir la sesión de WhatsApp Web.
+- **Filtrado Estricto de Libreta:** Solo se despachan mensajes a destinatarios activamente habilitados en `recipients.txt`. Si un número solicitado no figura en la libreta activa, se omite con aviso en log.
 - **Matriz Anti-Spam:** Llave compuesta `phone + ":" + epcHex` con cooldown configurable por entorno (`WHATSAPP_COOLDOWN_SEC`, por defecto 30s en pruebas / 10m en producción).
 
 ---

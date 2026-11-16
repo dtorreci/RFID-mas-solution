@@ -1,7 +1,7 @@
 import urllib.request
 import os
 
-url = 'http://192.168.1.86/cgi-bin/mqttsettings.cgi'
+url = 'http://192.168.1.143/cgi-bin/mqttsettings.cgi'
 reader_user = os.getenv('READER_USER', '<reader_user>')
 reader_pass = os.getenv('READER_PASS', '<reader_password>')
 pwd_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
@@ -23,7 +23,7 @@ fields = [
     ('TopicVersion', ''),
     ('MQTT_EnabledState', '1'),
     ('MQTTEnable', 'on'),
-    ('MQTT_Hostname', '192.168.1.75'),
+    ('MQTT_Hostname', '192.168.1.111'),
     ('MQTT_Port', '1883'),
     ('MQTT_Topic_Version', '0'),
     ('MQTT_BT_ClientID', '0000idx'),

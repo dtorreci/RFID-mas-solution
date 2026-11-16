@@ -40,8 +40,10 @@ type Plugin struct {
 	mu               sync.Mutex
 	lastSentPerTag   map[string]time.Time // key: phone + ":" + epcHex
 	cooldown         time.Duration
+	contactsMu       sync.RWMutex         // Protege cachedRecipients contra carreras de lectura/escritura
 	recipientsPath   string
 	recipientsMTime  time.Time
+	recipientsSize   int64
 	cachedRecipients []Contact
 }
 
@@ -84,17 +86,42 @@ func NewPlugin() (*Plugin, error) {
 		recipientsPath: recipientsPath,
 	}
 
-	// Initial load of contacts
-	p.loadContacts()
+	// Initial load of contacts under mutex
+	p.reloadContacts("Carga Inicial")
+
+	// Start reactive FileWatcher to hot-reload memory if recipients.txt changes
+	go p.startRecipientsWatcher()
 
 	go p.initWhatsAppWeb()
 
 	return p, nil
 }
 
-func (p *Plugin) loadContacts() []Contact {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (p *Plugin) startRecipientsWatcher() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		stat, err := os.Stat(p.recipientsPath)
+		if err != nil {
+			continue
+		}
+
+		p.contactsMu.RLock()
+		changed := stat.ModTime().After(p.recipientsMTime) || stat.Size() != p.recipientsSize
+		p.contactsMu.RUnlock()
+
+		if changed {
+			// Debounce to ensure file write buffer completed
+			time.Sleep(100 * time.Millisecond)
+			p.reloadContacts("FileWatcher")
+		}
+	}
+}
+
+func (p *Plugin) reloadContacts(trigger string) []Contact {
+	p.contactsMu.Lock()
+	defer p.contactsMu.Unlock()
 
 	stat, err := os.Stat(p.recipientsPath)
 	if err != nil {
@@ -111,13 +138,9 @@ func (p *Plugin) loadContacts() []Contact {
 		}
 	}
 
-	if !stat.ModTime().After(p.recipientsMTime) && len(p.cachedRecipients) > 0 {
-		return p.cachedRecipients
-	}
-
 	file, err := os.Open(p.recipientsPath)
 	if err != nil {
-		log.Printf("[WHATSAPP] ⚠️ Error abriendo %s: %v", p.recipientsPath, err)
+		fmt.Fprintf(os.Stderr, "[WHATSAPP BPR] ⚠️ Error abriendo %s: %v\n", p.recipientsPath, err)
 		return p.cachedRecipients
 	}
 	defer file.Close()
@@ -150,8 +173,23 @@ func (p *Plugin) loadContacts() []Contact {
 
 	p.cachedRecipients = contacts
 	p.recipientsMTime = stat.ModTime()
-	log.Printf("[WHATSAPP] 📖 Libreta de direcciones cargada (%d contactos) desde %s", len(contacts), p.recipientsPath)
+	p.recipientsSize = stat.Size()
+
+	var names []string
+	for _, c := range contacts {
+		names = append(names, fmt.Sprintf("%s (%s, %s)", c.Name, c.Phone, c.Lang))
+	}
+	fmt.Fprintf(os.Stderr, "   📲 [WHATSAPP BPR] 🔄 [%s] Memoria actualizada: %d contactos activos: [%s] (Fuente: %s)\n",
+		trigger, len(contacts), strings.Join(names, ", "), p.recipientsPath)
 	return contacts
+}
+
+func (p *Plugin) GetActiveContacts() []Contact {
+	p.contactsMu.RLock()
+	defer p.contactsMu.RUnlock()
+	cp := make([]Contact, len(p.cachedRecipients))
+	copy(cp, p.cachedRecipients)
+	return cp
 }
 
 func detectLanguage(phone, explicitLang string) string {
@@ -293,14 +331,14 @@ func (p *Plugin) OnEvent(ctx *sdk.Context, event sdk.Event) ([]sdk.Message, erro
 		distVal = d
 	}
 
-	// Hot-reload contacts from address book
-	allContacts := p.loadContacts()
+	// Obtener los contactos activos en memoria protegidos bajo sync.RWMutex
+	activeContacts := p.GetActiveContacts()
 
 	// Determine targets
 	var targetContacts []Contact
 	phoneTrim := strings.TrimSpace(phoneRaw)
 	if phoneTrim == "" || phoneTrim == "all" || phoneTrim == "*" || phoneTrim == "broadcast" {
-		targetContacts = allContacts
+		targetContacts = activeContacts
 	} else {
 		// Specific numbers (comma separated or single)
 		parts := strings.Split(phoneTrim, ",")
@@ -310,7 +348,7 @@ func (p *Plugin) OnEvent(ctx *sdk.Context, event sdk.Event) ([]sdk.Message, erro
 				continue
 			}
 			found := false
-			for _, c := range allContacts {
+			for _, c := range activeContacts {
 				if c.Phone == pt {
 					targetContacts = append(targetContacts, c)
 					found = true
@@ -318,12 +356,14 @@ func (p *Plugin) OnEvent(ctx *sdk.Context, event sdk.Event) ([]sdk.Message, erro
 				}
 			}
 			if !found {
-				targetContacts = append(targetContacts, Contact{
-					Name:  "Usuario",
-					Phone: pt,
-					Lang:  detectLanguage(pt, ""),
-				})
+				fmt.Fprintf(os.Stderr, "   📲 [WHATSAPP BPR] ⚠️ El número %s no está habilitado en recipients.txt activo; omitiendo.\n", pt)
 			}
+		}
+
+		// Si todos los números específicos solicitados estaban comentados/no encontrados pero hay contactos activos en recipients.txt, despachar a la libreta activa
+		if len(targetContacts) == 0 && len(activeContacts) > 0 {
+			fmt.Fprintf(os.Stderr, "   📲 [WHATSAPP BPR] ℹ️ Número solicitado '%s' no está habilitado; despachando a los contactos activos en recipients.txt (%d destinatarios).\n", phoneTrim, len(activeContacts))
+			targetContacts = activeContacts
 		}
 	}
 

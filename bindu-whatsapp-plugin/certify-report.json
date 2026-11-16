@@ -1,23 +1,23 @@
 {
   "pluginId": "bindu-whatsapp-plugin",
   "version": "1.0.0",
-  "timestamp": "2026-11-13T11:29:40Z",
+  "timestamp": "2026-11-16T12:25:31Z",
   "status": "warn",
   "warnings": [
-    "large file detected (26004579 bytes): bindu-whatsapp-plugin"
+    "large file detected (26004426 bytes): bindu-whatsapp-plugin"
   ],
   "issues": [
     {
       "code": "W_GENERIC",
       "level": "warning",
-      "message": "large file detected (26004579 bytes): bindu-whatsapp-plugin"
+      "message": "large file detected (26004426 bytes): bindu-whatsapp-plugin"
     }
   ],
   "checksums": {
-    "attestations/preflight.json": "00d160e08d5fa32899099ae429be754d585f0ff024801af14d9ae9d9ac3c5a94",
-    "bundle": "19e2434d7f6293d62460f40ef95ac85a0153a9c32ae64a16dbb24a94fb1b5aec",
-    "manifest.json": "8fb5e87654c34e4a2d40eacf71ea722eeb497585c416ab245919d44e77f1439a",
-    "sha256sums.txt": "49b59a0f0894dc90e0e6f190de977b7b28aeb2c91f8c43aa32f54b295b81ab18"
+    "attestations/preflight.json": "be26ab89aad89f7801931bc72d178af6b6d96ef4499d76441cf12ea47d624a2f",
+    "bundle": "f02ff76c2f96638795ae68a9adaafdba14650b4571c05fe7a7a591b01a2b9675",
+    "manifest.json": "7ae5fba07ee066d33f9f04097811ac0bf238a470bbe05f52023a8af694f1bda1",
+    "sha256sums.txt": "3f52c3038b1e7fd051067de15dc86c58122eabb93f6f463168589ff69f3bc94a"
   },
   "bundlePath": "/home/dtp/solutions/RFID-mas-solution/bindu-whatsapp-plugin.tar.gz",
   "dryRun": false

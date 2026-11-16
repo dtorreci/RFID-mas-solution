@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	conn, err := net.DialTimeout("tcp", "192.168.1.86:5084", 5*time.Second)
+	conn, err := net.DialTimeout("tcp", "192.168.1.143:5084", 5*time.Second)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -55,7 +55,7 @@ func main() {
 				fwStr = string(pData[13 : 13+fwLen])
 			}
 
-			fmt.Println("=== Datos Generales del Lector R2000 (192.168.1.86) ===")
+			fmt.Println("=== Datos Generales del Lector R2000 (192.168.1.143) ===")
 			fmt.Printf("• Número de Antenas: %d\n", maxAnt)
 			fmt.Printf("• Soporta UTC Timestamp: %v\n", canUTC)
 			fmt.Printf("• Fabricante ID: %d (0x%08X)\n", devMfg, devMfg)

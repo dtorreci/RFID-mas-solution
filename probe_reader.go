@@ -16,7 +16,7 @@ const (
 )
 
 func main() {
-	target := "192.168.1.86:5084"
+	target := "192.168.1.143:5084"
 	fmt.Printf("=== Prospección LLRP en Lector Físico %s ===\n", target)
 
 	conn, err := net.DialTimeout("tcp", target, 5*time.Second)
