@@ -122,9 +122,8 @@ flowchart TB
 | Componente / Proceso | Rol Funcional | Dónde se Ejecuta | Binario / Servicio | Protocolo / Interfaz |
 | :--- | :--- | :--- | :--- | :--- |
 | **`ireader` (LLRP)** | Driver de hardware de los 4 puertos RF | **`NODE`** (Lector Sensormatic IDX-4000) | `/usr/bin/ireader` (daemon nativo) | TCP Loopback `127.0.0.1:5084` |
-| **`bindu-idx4000-plugin`** | Plugin BPR supervisor de telemetría LLRP | **`NODE`** (Lector Sensormatic IDX-4000) | `bin/armv7/plugin` | BPR Stdio Pipes (`stdin`/`stdout`) |
-| **`bindu-node`** | Agente de borde Bindu con Strong Identity | **`NODE`** (Lector Sensormatic IDX-4000) | `/home/dtp/.bindu/node/bindu-node` | mTLS Mesh hacia `ROOT:1883` |
-| **Canal Mesh mTLS** | Túnel seguro de datos de la malla | **`RED MESH`** (`node` $\leftrightarrow$ `root`) | Puerto TCP `1883` (mTLS mutuo) | Protocolo binario Bindu Mesh (Zero-MQTT) |
+| **`idx4000_edge_agent`** | Agente de borde nativo Bindu 0.17.520 (ARMv7) | **`NODE`** (Lector Sensormatic IDX-4000) | `/customer_apps/idx4000_edge_agent` | LLRP Loopback + mTLS Mesh hacia `ROOT:1883` |
+| **Canal Mesh mTLS** | Túnel seguro de datos de la malla | **`RED MESH`** (`node` $\leftrightarrow$ `root`) | Puerto TCP `1883` (mTLS mutuo) | Protocolo binario Bindu Mesh (Zero-Plaintext Wire) |
 | **`bindu-root`** | Gateway orquestador central y ledger SQLite | **`ROOT`** (Servidor Gateway `192.168.1.111`) | `/home/dtp/.bindu/root/bindu-root` | SQLite `bindu_messages.db`, Consola 8080 |
 | **Pipeline Google CEL** | Inferencia cinemática determinista (< 1 ms) | **`ROOT`** (In-memory en daemon `bindu-root`) | `CELReactorPlugin` (in-process) | Google CEL (`RawTagRead` $\to$ `TagRadialMotion`) |
 | **Semantic AI Reactor** | Adaptador y validador del contrato de IA | **`ROOT`** (In-memory en daemon `bindu-root`) | `SemanticReactorAdapter` (in-process) | Coerción de esquema `SendWhatsAppRequest` |
@@ -138,12 +137,34 @@ flowchart TB
 
 ### 2.1. Nodo Bindu Edge en Sensormatic IDX-4000
 - **Hardware & SO**: Procesador Freescale i.MX6 Dual/Quad (ARMv7 Cortex-A7 32-bit), Linux 5.15 LTS, lector RFID de 4 puertos RF Sensormatic IDX-4000 (`192.168.1.143`).
-- **Strong Identity (`idx4000-00-50-f9-d1-0a-2b`)**: Identidad criptográfica vinculada a la dirección MAC física del adaptador Ethernet `eth0` (`00:50:f9:d1:0a:2b`). Resuelve de raíz problemas de asignación dinámica de IPs y garantiza que las claves mTLS del nodo no colisionen en la malla.
+- **Strong Identity (`idx4000-00-50-f9-d1-0a-2b`)**: Identidad criptográfica vinculada a la dirección MAC física del adaptador Ethernet `eth0` (`00:50:f9:d1:0a:2b`), registrada formalmente en la topología `mesh.json`. Resuelve de raíz problemas de asignación dinámica de IPs y garantiza que las claves mTLS del nodo no colisionen en la malla.
+- **Arquitectura Bottom-Up Invariable**: Siguiendo las directrices canónicas de Bindu 0.17.520 y la documentación de arquitectura (`GEMINI.md` / `BINDU.md`), el nodo de borde emite toda su telemetría y eventos de abajo hacia arriba (*Bottom-Up*):
+  - Enrutamiento estricto: `routing: ["local", "parent"]`.
+  - Prohibido terminantemente el enrutamiento `"child"` desde nodos hoja hacia el Gateway.
+  - Ingress Topic canónico: `bindu/in` para eventos de sistema y `bindu/in/raw/rfid/idx4000` para capturas de tags.
+- **Implementación Canónica de System Event Types (Bindu 0.17.520)**:
+  El agente de borde [edge_agent/main.go](file:///home/dtp/solutions/RFID-mas-solution/edge_agent/main.go) incorpora los 4 tipos de eventos de sistema oficiales:
+  1. **`NodePresence` (Heartbeat cada 60s)**:
+     - Notifica al Root Gateway la presencia y disponibilidad del nodo en la malla.
+     - Payload completo con IPs activas (`192.168.1.143:1883`, `10.255.0.2:1883`), alias de hardware, TTL de 5400 segundos y versión de release `0.17.520`.
+  2. **`MessageState` (Telemetría de Recursos cada 30s)**:
+     - Inspecciona dinámicamente `/proc/loadavg` (carga a 1m y 5m), `/proc/meminfo` (RAM libre y porcentaje usado), `statfs` del sistema de archivos en `/customer_apps` y el estado operativo del demonio nativo `ireader-llrp-daemon`.
+     - Contabiliza en tiempo real el volumen de mensajes acumulados por tipo (`RawTagRead`, `NodePresence`, `MessageState`, `ErrorEvent`).
+  3. **`MessagePing` (Comprobación RTT cada 25s)**:
+     - Realiza dos funciones simultáneas: envía un paquete `PINGREQ` nativo a nivel de socket MQTT y publica un envelope `MessagePing` formal con payload `{}` vacío según el estándar Bindu para auditar latencias y asegurar que los *middleboxes* y cortafuegos de red no congelen el socket mTLS.
+  4. **`ErrorEvent` (Diagnóstico Proactivo en Borde)**:
+     - Publica eventos estructurados ante excepciones en el enlace mTLS, fallos de handshake LLRP o problemas de I/O en el hardware.
+- **HealthGuard & Resiliencia en Red (Eliminación de Nodos Zombi)**:
+  - En caso de reinicio del Root Gateway o micro-cortes de red, un fallo en la publicación MQTT es interceptado inmediatamente por el monitor `HealthGuard`.
+  - Aborta sincronizadamente el bucle de lectura `readLoop()` mediante primitivas atómicas, cierra el socket TCP de LLRP y fuerza el reinicio limpio en caliente tanto del túnel mTLS como de la sesión ROSpec del lector. Esto previene que el lector quede en estado zombi (antena encendida pero eventos descartados sin entrega).
+- **Alineación de Memoria ARMv7 (8-Byte Atomic Alignment)**:
+  - En arquitecturas ARM de 32 bits, las operaciones atómicas de 64 bits (`sync/atomic`) requieren alineación obligatoria de 8 bytes en memoria para evitar el panic de kernel `unaligned 64-bit atomic operation`.
+  - Los campos de métricas (`readsCount`, `presenceCount`, `stateCount`, `pingCount`, `errorCount`) se definen con tipos `atomic.Int64` ubicados al inicio de la estructura de datos en Go.
 - **Autoarranque Nativo como `customer_app`**:
   - Binario estático compilado en ARMv7: [edge_agent/idx4000_edge_agent](file:///home/dtp/solutions/RFID-mas-solution/edge_agent/idx4000_edge_agent).
   - Wrapper supervisor en `/customer_apps/customerApp` integrado en el ciclo de inicio del firmware del lector: se levanta automáticamente tras el arranque del kernel Linux 5.15, conecta por loopback TCP al demonio nativo `ireader` (LLRP `127.0.0.1:5084`), configura la ROSpec de 18 dBm en la antena 1 (Keonn Advan-CP1 EU) y establece el túnel mTLS autenticado con Bindu Root (`192.168.1.111:1883`).
   - Supervisor resiliente: cuenta con un bucle `while true` que reconecta y reinicia el agente ante cualquier interrupción sin requerir reiniciar el lector.
-- **Zero Conexiones Directas a MQTT**: No existe ningún broker MQTT expuesto ni clientes conectándose directamente por fuera de la malla. Toda la información viaja por el protocolo seguro interno de Bindu.
+- **Zero-Plaintext Wire Guarantee**: Ningún dato ni comando circula en texto plano por la red. La autenticación y el transporte se ejecutan exclusivamente mediante TLS mutuo (mTLS con certificados x509 generados por la CA interna de Bindu).
 
 ### 2.2. Pipeline Determinista Google CEL (In-Memory en Root)
 El archivo [chained_rfid_reactors.json](file:///home/dtp/solutions/RFID-mas-solution/chained_rfid_reactors.json) orquesta la normalización y cinemática con latencia sub-microsegundo:
@@ -234,6 +255,15 @@ flowchart LR
 | **`RfidAlertTranslationRequest`** | CEL: `rfid_on_surface_translation_dispatcher` | AI: `rfid-ai-copilot-auditor` | `phone_number`, `language`, `message`, `epc_hex`, `gtin14`, `serial_number`, `rssi` |
 | **`SendWhatsAppRequest`** | AI: `rfid-ai-copilot-auditor` | BPR: `bindu-whatsapp-plugin` | `phone_number`, `message_text`, `epc_hex`, `reader_mac`, `rssi` |
 | **`SendWhatsAppResult`** | BPR: `bindu-whatsapp-plugin` | Bindu Ledger (SQLite `v_messages`) | `recipient`, `status`, `message_id`, `delivery_timestamp` |
+
+### Eventos Canónicos de Sistema (Bindu 0.17.520 System Events)
+
+| Evento de Sistema | Origen / Frecuencia | Destino | Campos / Contenido |
+| :--- | :--- | :--- | :--- |
+| **`NodePresence`** | `idx4000-00-50-f9-d1-0a-2b` (cada 60s) | `root` (`bindu/in`) | `node_id`, `addresses`, `aliases`, `endpoints`, `version: 0.17.520`, `ttl_seconds: 5400` |
+| **`MessageState`** | `idx4000-00-50-f9-d1-0a-2b` (cada 30s) | `root` (`bindu/in`) | `identity`, `platform`, `cpu` (load 1m/5m, cores), `memory` (MB, %), `disk` (GB, %), `system_plugins` (`ireader`), `storage` (conteos por tipo) |
+| **`MessagePing`** | `idx4000-00-50-f9-d1-0a-2b` (cada 25s) | `root` (`bindu/in`) | Envelope formal con `fields: {}`, cabeceras `$src`, `$node-dest: root`, `$when`, RTT audit |
+| **`ErrorEvent`** | `idx4000-00-50-f9-d1-0a-2b` (bajo excepción) | `root` (`bindu/in`) | `error_type`, `client_id`, `topic`, `reason`, `payload`, `timestamp` |
 
 ---
 
@@ -356,9 +386,47 @@ bindu-studio solution pack --id rfid-industrial-proximity-guardian-mas --strict=
 
 ---
 
+### 5.6. Compilación y Despliegue del Edge Agent en el Lector Sensormatic IDX-4000
+
+El agente de borde se ejecuta de forma nativa en la CPU interna ARMv7 del lector Sensormatic IDX-4000:
+
+```bash
+# 1. Compilación cruzada estática para ARMv7 (Linux 32-bit)
+CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" \
+  -o edge_agent/idx4000_edge_agent edge_agent/main.go edge_agent/bitreader.go
+
+# 2. Subida atómica al lector vía FTP (/customer_apps/)
+curl -u admin:USBB24 -T edge_agent/idx4000_edge_agent ftp://192.168.1.143/idx4000_edge_agent.new
+
+# 3. Renombrado atómico (POSIX rename) para evitar ETXTBSY
+python3 -c "
+import ftplib
+ftp = ftplib.FTP('192.168.1.143')
+ftp.login('admin', 'USBB24')
+ftp.rename('idx4000_edge_agent.new', 'idx4000_edge_agent')
+ftp.quit()
+"
+
+# 4. Inspección de logs en tiempo real desde el lector
+python3 -c "
+import ftplib
+ftp = ftplib.FTP('192.168.1.143')
+ftp.login('admin', 'USBB24')
+lines = []
+ftp.retrlines('RETR edge_agent.log', lines.append)
+ftp.quit()
+print('\n'.join(lines[-25:]))
+"
+```
+
+---
+
 ## 💡 6. Tips & Findings de Ingeniería
 
 1. **Desacoplamiento BPR vs AI:** En arquitecturas de sistemas multi-agente modernos, el plugin de salida jamás debe formatear ni traducir texto estáticamente. Al suprimir `formatAlertMessage` del plugin de WhatsApp, el código Go se redujo a un conector de transporte asíncrono puro, delegando el 100% de la semántica y de la internacionalización en el reactor cognitivo SLM.
 2. **Prioridad Explicita vs Few-Shot:** En modelos pequeños (SLMs de 1.5B), si el ejemplo *few-shot* del prompt contiene una lengua fija (como el castellano), el modelo puede ignorar el prefijo telefónico y copiar el ejemplo. Especificar `target_language` dinámicamente y priorizar el campo `language` sobre el prefijo elimina este sesgo.
 3. **Persistencia de Sesiones WhatsApp Web:** Las credenciales y claves Signal de WhatsApp Web residen en `/home/dtp/.bindu/root/runtime/data/whatsapp_web_session.db`, permitiendo reiniciar demonios o actualizar plugins BPR sin perder la autenticación ni requerir escanear un nuevo código QR.
-4. **Resiliencia en Borde Cero-MQTT:** Desplegar `bindu-node` en la CPU interna del Sensormatic IDX-4000 con identidad inmutable basada en MAC elimina los problemas de seguridad, enrutamiento y cambios de IP característicos de entornos de almacén y logística industrial.
+4. **Resiliencia en Borde Cero-MQTT:** Desplegar el agente en la CPU interna del Sensormatic IDX-4000 con identidad inmutable basada en MAC elimina los problemas de seguridad, enrutamiento y cambios de IP característicos de entornos de almacén y logística industrial.
+5. **Diagnóstico del "Lector Zombi" y Desfase Temporal:** Si el Gateway central Bindu Root se reinicia, el socket TCP mTLS se cierra. En implementaciones donde las lecturas LLRP se procesan en goroutines desacopladas sin supervisión de socket, el hardware RFID continúa radiando RF y el LED de lectura parpadea físicamente ante tags reales, pero las tramas caen al suelo en silencio. Al implementar el patrón `HealthGuard` con `MessagePing` periódico bidireccional, cualquier desconexión MQTT aborta de inmediato el bucle LLRP y fuerza una reconexión ordenada completa, garantizando latencias < 15ms en cuanto se restablece el enlace.
+6. **Alineación Atómica Obligatoria en ARMv7 (32-bit):** Las llamadas de `sync/atomic` sobre enteros de 64 bits (`int64`, `uint64`) en Linux ARMv7 provocan un *panic* fatal (`unaligned 64-bit atomic operation`) si el campo no reside en una dirección múltiplo de 8 bytes. La solución idiomática y robusta consiste en emplear los tipos `atomic.Int64` y situarlos al inicio de la estructura Go (`struct Agent`).
+7. **Reemplazo Atómico de Binarios en Ejecución (Evitar ETXTBSY):** Intentar sobreescribir vía FTP un binario en ejecución devuelve error `553 Could not create file` (`ETXTBSY - Text file busy`). En sistemas POSIX/Linux, la llamada `rename()` (`mv`) es atómica a nivel de inodo y no abre el descriptor en modo truncado: subir el artefacto como `*.new` y renombrarlo sobre el binario en ejecución sustituye la entrada en el directorio sin interrumpir el proceso activo hasta su siguiente recarga.
