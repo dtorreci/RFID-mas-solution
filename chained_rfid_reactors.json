@@ -18,7 +18,7 @@
         "transformation_expression": {
           "epc": "string(payload.payload.epc)",
           "device_mac": "has(payload.payload.mac) ? string(payload.payload.mac) : '00:50:f9:d1:0a:2b'",
-          "reader_id": "has(payload.payload.reader_id) ? string(payload.payload.reader_id) : 'idx4000-d10a2b'",
+          "reader_id": "has(payload.payload.reader_id) ? string(payload.payload.reader_id) : 'idx4000-00-50-f9-d1-0a-2b'",
           "antenna": "int(payload.payload.antenna)",
           "rssi": "double(payload.payload.rssi)",
           "read_count": "has(payload.payload.read_count) ? int(payload.payload.read_count) : 1",

@@ -15,8 +15,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -33,12 +35,12 @@ var clientKeyPEM []byte
 const (
 	DefaultLLRPAddr = "127.0.0.1:5084"
 	DefaultMQTTAddr = "192.168.1.111:1883"
+	CanonicalNodeID = "idx4000-00-50-f9-d1-0a-2b"
 	TargetGTIN      = "07621806175810"
 	TargetEPCHex    = "30b5d132b8112b42f9b59b2a"
 	TargetSerial    = "12779363114"
-	TargetPrefix    = "7621806"
-	TargetItemRef   = "017581"
 	AntennaModel    = "Keonn Advan-CP1 EU"
+	BinduVersion    = "0.17.520"
 	MinPublishGap   = 100 * time.Millisecond
 )
 
@@ -52,21 +54,45 @@ type MotionTracker struct {
 	straysFilter int
 }
 
+type BinduEnvelope struct {
+	Type       string `json:"$type"`
+	Group      string `json:"$group"`
+	Producer   string `json:"$producer"`
+	Node       string `json:"$node,omitempty"`
+	NodeOrigin string `json:"$node-origin,omitempty"`
+	NodeDest   string `json:"$node-dest,omitempty"`
+	Src        string `json:"$src,omitempty"`
+	UptimeSec  int64  `json:"$uptime_sec,omitempty"`
+	User       string `json:"$user,omitempty"`
+	When       string `json:"$when"`
+	Fields     any    `json:"fields"`
+}
+
 type Agent struct {
-	macAddr   string
-	readerID  string
-	llrpAddr  string
-	mqttAddr  string
-	antennaID uint16
-	powerDbm  uint16
-	allTags   bool
-	mqttUser  string
-	mqttPass  string
-	llrpConn  net.Conn
-	mqttConn  net.Conn
-	tracker   *MotionTracker
-	running   bool
-	mqttMu    sync.Mutex
+	// 64-bit atomic counters placed first for strict 8-byte alignment on 32-bit ARM (ARMv7)
+	readsCount    atomic.Int64
+	presenceCount atomic.Int64
+	stateCount    atomic.Int64
+	pingCount     atomic.Int64
+	errorCount    atomic.Int64
+	aborted       atomic.Int32
+
+	macAddr       string
+	nodeID        string
+	llrpAddr      string
+	mqttAddr      string
+	antennaID     uint16
+	powerDbm      uint16
+	allTags       bool
+	mqttUser      string
+	mqttPass      string
+	llrpConn      net.Conn
+	mqttConn      net.Conn
+	tracker       *MotionTracker
+	running       bool
+	startTime     time.Time
+	mqttMu        sync.Mutex
+	reconnectChan chan struct{}
 }
 
 type RawTagItem struct {
@@ -95,6 +121,34 @@ func getMacAddress() string {
 	return "00:50:F9:D1:0A:2B"
 }
 
+func getLocalIPAddresses() []string {
+	var ips []string
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return []string{"192.168.1.143"}
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil {
+					ips = append(ips, ipnet.IP.String())
+				}
+			}
+		}
+	}
+	if len(ips) == 0 {
+		return []string{"192.168.1.143"}
+	}
+	return ips
+}
+
 func main() {
 	llrpAddr := flag.String("llrp", DefaultLLRPAddr, "LLRP reader address (host:port)")
 	mqttAddr := flag.String("mqtt", DefaultMQTTAddr, "Bindu MQTT broker address (host:port)")
@@ -103,37 +157,44 @@ func main() {
 	ant := flag.Int("ant", 0, "Antenna port (0=all antennas, 1-4)")
 	power := flag.Int("power", 18, "Transmit power in dBm (default: 18 dBm)")
 	allTags := flag.Bool("all-tags", true, "Publish all tags (false=filter target EPC only)")
+	nodeIDFlag := flag.String("node-id", "", "Canonical Bindu Node ID (default: derived from MAC or CanonicalNodeID)")
 	flag.Parse()
 
 	mac := getMacAddress()
-	cleanMac := strings.ToLower(strings.ReplaceAll(mac, ":", ""))
-	shortID := cleanMac
-	if len(shortID) > 6 {
-		shortID = shortID[len(shortID)-6:]
+	nodeID := *nodeIDFlag
+	if nodeID == "" {
+		formattedMac := strings.ToLower(strings.ReplaceAll(mac, ":", "-"))
+		if formattedMac == "00-50-f9-d1-0a-2b" {
+			nodeID = CanonicalNodeID
+		} else {
+			nodeID = fmt.Sprintf("idx4000-%s", formattedMac)
+		}
 	}
-	readerID := fmt.Sprintf("idx4000-%s", shortID)
 
 	fmt.Println("=========================================================================================")
-	fmt.Printf("   🚀 SENSORMATIC IDX-4000 ON-READER EDGE AGENT (ARMv7 Native)\n")
-	fmt.Printf("   🏷️ Hardware MAC: %s | Reader ID: %s\n", mac, readerID)
+	fmt.Printf("   🚀 SENSORMATIC IDX-4000 BINDU EDGE AGENT (ARMv7 Native / Bindu %s)\n", BinduVersion)
+	fmt.Printf("   🏷️ Hardware MAC: %s | Canonical Node ID: %s\n", mac, nodeID)
 	fmt.Printf("   📡 Local LLRP: %s | Antena Port %d (%s) | Potencia: %d dBm\n", *llrpAddr, *ant, AntennaModel, *power)
 	fmt.Printf("   🎯 Target GTIN: %s (EPC: %s)\n", TargetGTIN, TargetEPCHex)
-	fmt.Printf("   📦 Raw Ingress Pipeline: bindu/in/raw/rfid/idx4000 (Pure decoupled telemetry)\n")
+	fmt.Printf("   📦 Raw Ingress Pipeline: bindu/in/raw/rfid/idx4000 (Bottom-Up Telemetry)\n")
+	fmt.Printf("   🛡️ System Event Types: NodePresence, MessageState, MessagePing, ErrorEvent\n")
 	fmt.Printf("   🔒 MQTT Broker: %s (mTLS with Embedded Root CA + Client Cert)\n", *mqttAddr)
 	fmt.Println("=========================================================================================")
 
 	agent := &Agent{
-		macAddr:   mac,
-		readerID:  readerID,
-		llrpAddr:  *llrpAddr,
-		mqttAddr:  *mqttAddr,
-		antennaID: uint16(*ant),
-		powerDbm:  uint16(*power),
-		allTags:   *allTags,
-		mqttUser:  *user,
-		mqttPass:  *pass,
-		tracker:   &MotionTracker{},
-		running:   true,
+		macAddr:       mac,
+		nodeID:        nodeID,
+		llrpAddr:      *llrpAddr,
+		mqttAddr:      *mqttAddr,
+		antennaID:     uint16(*ant),
+		powerDbm:      uint16(*power),
+		allTags:       *allTags,
+		mqttUser:      *user,
+		mqttPass:      *pass,
+		tracker:       &MotionTracker{},
+		running:       true,
+		startTime:     time.Now(),
+		reconnectChan: make(chan struct{}, 1),
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -154,6 +215,7 @@ func main() {
 
 func (a *Agent) stop() {
 	a.running = false
+	a.aborted.Store(1)
 	if a.llrpConn != nil {
 		a.llrpConn.Write(encodeLLRP(23, 999, uint32Bytes(1))) // STOP_ROSPEC
 		a.llrpConn.Close()
@@ -161,49 +223,67 @@ func (a *Agent) stop() {
 	a.disconnectMQTT()
 }
 
+func (a *Agent) triggerReconnect(reason string) {
+	if a.aborted.CompareAndSwap(0, 1) {
+		fmt.Printf("[HEALTH-GUARD] 🚨 Fallo de conexión detectado (%s). Abortando bucles para reconexión...\n", reason)
+		if a.llrpConn != nil {
+			a.llrpConn.Close()
+		}
+		select {
+		case a.reconnectChan <- struct{}{}:
+		default:
+		}
+	}
+}
+
 func (a *Agent) run() error {
 	for a.running {
+		a.aborted.Store(0)
+
 		fmt.Printf("\n[CONEXIÓN] Estableciendo enlace mTLS con Bindu Mesh Gateway (%s)...\n", a.mqttAddr)
 		if err := a.connectMQTT(); err != nil {
 			fmt.Printf("[MQTT] ⚠️ Fallo al conectar con Bindu: %v. Reintentando en 3s...\n", err)
 			time.Sleep(3 * time.Second)
 			continue
 		}
-		fmt.Printf("[MQTT] ✅ Enlace mTLS autenticado exitosamente (Client: %s, User: %s)\n", a.readerID, a.mqttUser)
+		fmt.Printf("[MQTT] ✅ Enlace mTLS autenticado exitosamente (NodeID: %s, User: %s)\n", a.nodeID, a.mqttUser)
 
-		// Goroutine de ping periódico para mantener vivo el socket MQTT
-		stopPing := make(chan struct{})
-		go func() {
-			ticker := time.NewTicker(25 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-					a.mqttMu.Lock()
-					if a.mqttConn != nil {
-						a.mqttConn.Write([]byte{0xC0, 0x00}) // PINGREQ
-					}
-					a.mqttMu.Unlock()
-				case <-stopPing:
-					return
-				}
-			}
-		}()
+		// 1. Emitir NodePresence de arranque
+		if err := a.sendNodePresence(); err != nil {
+			fmt.Printf("[PRESENCE] ⚠️ Fallo al emitir NodePresence inicial: %v\n", err)
+		} else {
+			fmt.Println("[PRESENCE] 🟢 NodePresence inicial registrado con éxito en Bindu Root.")
+		}
 
+		// 2. Emitir MessageState inicial
+		if err := a.sendMessageState(); err != nil {
+			fmt.Printf("[STATE] ⚠️ Fallo al emitir MessageState inicial: %v\n", err)
+		} else {
+			fmt.Println("[STATE] 📊 MessageState inicial emitido (Salud y recursos del hardware).")
+		}
+
+		// 3. Goroutines de eventos del sistema (Heartbeats, State y Ping)
+		stopLoops := make(chan struct{})
+		go a.startSystemEventLoops(stopLoops)
+
+		// 4. Conectar a LLRP interno
 		fmt.Printf("[CONEXIÓN] Conectando a servicio interno LLRP (%s)...\n", a.llrpAddr)
 		if err := a.connectLLRP(); err != nil {
 			fmt.Printf("[LLRP] ⚠️ Error conectando con ireader daemon: %v. Reintentando en 3s...\n", err)
-			close(stopPing)
+			a.sendErrorEvent("LLRP_DAEMON_CONNECT_FAILED", fmt.Sprintf("Error conectando con ireader: %v", err), "")
+			close(stopLoops)
 			a.disconnectMQTT()
 			time.Sleep(3 * time.Second)
 			continue
 		}
 		fmt.Println("[LLRP] ✅ Conexión establecida con servicio RFID local de Sensormatic.")
 
+		// 5. Configurar y arrancar ROSpec
 		fmt.Printf("[ROSPEC] Configurando ROSpec #1 (Antena %d a %d dBm)...\n", a.antennaID, a.powerDbm)
 		if err := a.setupAndStartROSpec(); err != nil {
 			fmt.Printf("[ROSPEC] ⚠️ Fallo al inicializar ROSpec: %v\n", err)
-			close(stopPing)
+			a.sendErrorEvent("ROSPEC_INITIALIZATION_FAILED", fmt.Sprintf("Fallo al iniciar ROSpec: %v", err), "")
+			close(stopLoops)
 			a.disconnectLLRP()
 			a.disconnectMQTT()
 			time.Sleep(3 * time.Second)
@@ -211,21 +291,368 @@ func (a *Agent) run() error {
 		}
 		fmt.Println("[ROSPEC] ✅ ROSpec ejecutándose. Lector radiando en puerto de antena 1.")
 
+		// 6. Bucle principal de lectura LLRP
 		if err := a.readLoop(); err != nil {
-			fmt.Printf("[LOOP] Desconexión de datos: %v\n", err)
+			fmt.Printf("[LOOP] Desconexión de datos LLRP / Red: %v\n", err)
 		}
 
-		close(stopPing)
+		close(stopLoops)
 		a.disconnectLLRP()
 		a.disconnectMQTT()
 
 		if a.running {
-			fmt.Println("[RECONNECT] Esperando 3 segundos antes de reiniciar ciclo...")
+			fmt.Println("[RECONNECT] Esperando 3 segundos antes de reiniciar ciclo de conexión...")
 			time.Sleep(3 * time.Second)
 		}
 	}
 	return nil
 }
+
+func (a *Agent) startSystemEventLoops(stopChan chan struct{}) {
+	presenceTicker := time.NewTicker(60 * time.Second)
+	stateTicker := time.NewTicker(30 * time.Second)
+	pingTicker := time.NewTicker(25 * time.Second)
+	defer presenceTicker.Stop()
+	defer stateTicker.Stop()
+	defer pingTicker.Stop()
+
+	for {
+		select {
+		case <-stopChan:
+			return
+		case <-presenceTicker.C:
+			if err := a.sendNodePresence(); err != nil {
+				fmt.Printf("[PRESENCE] ⚠️ Error emitiendo NodePresence periódico: %v\n", err)
+			}
+		case <-stateTicker.C:
+			if err := a.sendMessageState(); err != nil {
+				fmt.Printf("[STATE] ⚠️ Error emitiendo MessageState periódico: %v\n", err)
+			}
+		case <-pingTicker.C:
+			if err := a.sendMessagePing(); err != nil {
+				fmt.Printf("[PING] ⚠️ Error emitiendo MessagePing / PINGREQ: %v\n", err)
+				a.triggerReconnect("Fallo de ping MQTT hacia Bindu Root")
+			}
+		}
+	}
+}
+
+// -----------------------------------------------------------------------------
+// SYSTEM EVENT TYPES: IMPLEMENTACIONES FORMALES CONFORME A BINDU 0.17.520
+// -----------------------------------------------------------------------------
+
+func (a *Agent) sendNodePresence() error {
+	now := time.Now().UTC()
+	nowUTC := now.Format(time.RFC3339)
+	ips := getLocalIPAddresses()
+
+	var addresses []string
+	var endpoints []map[string]any
+	for _, ip := range ips {
+		addresses = append(addresses, fmt.Sprintf("%s:1883", ip))
+		endpoints = append(endpoints, map[string]any{
+			"host":     ip,
+			"kind":     "mesh_mqtt",
+			"port":     1883,
+			"priority": 100,
+			"tls":      true,
+		})
+	}
+
+	payloadFields := map[string]any{
+		"node_id":     a.nodeID,
+		"version":     BinduVersion,
+		"ttl_seconds": 5400,
+		"seen_at":     nowUTC,
+		"addresses":   addresses,
+		"aliases":     []string{"Sensormatic-IDX4000", a.nodeID},
+		"endpoints":   endpoints,
+	}
+
+	envelope := BinduEnvelope{
+		Type:       "NodePresence",
+		Group:      "mesh",
+		Producer:   a.nodeID,
+		NodeOrigin: a.nodeID,
+		NodeDest:   "root",
+		When:       nowUTC,
+		Fields:     payloadFields,
+	}
+
+	data, err := json.Marshal(envelope)
+	if err != nil {
+		return err
+	}
+
+	if err := a.publishMQTT("bindu/in", data); err != nil {
+		return err
+	}
+	a.presenceCount.Add(1)
+	return nil
+}
+
+func (a *Agent) sendMessageState() error {
+	now := time.Now().UTC()
+	nowUTC := now.Format(time.RFC3339)
+	uptimeSec := int64(time.Since(a.startTime).Seconds())
+
+	metrics := a.collectLinuxSystemMetrics()
+
+	totalMsgs := a.readsCount.Load() + a.presenceCount.Load() +
+		a.stateCount.Load() + a.errorCount.Load()
+
+	payloadFields := map[string]any{
+		"identity": map[string]any{
+			"node_id":    a.nodeID,
+			"role":       "node",
+			"uptime_sec": uptimeSec,
+			"version":    BinduVersion,
+		},
+		"platform": map[string]any{
+			"arch":   "arm",
+			"os":     "linux",
+			"target": "linux/armv7",
+		},
+		"cpu": map[string]any{
+			"cores_logical": metrics.CPUCores,
+			"load_1m":       metrics.CPULoad1m,
+			"load_5m":       metrics.CPULoad5m,
+			"usage_pct":     metrics.CPUUsagePct,
+		},
+		"memory": map[string]any{
+			"total_mb":     metrics.MemTotalMB,
+			"available_mb": metrics.MemAvailMB,
+			"used_pct":     metrics.MemUsedPct,
+		},
+		"disk": map[string]any{
+			"path":     metrics.DiskPath,
+			"total_gb": metrics.DiskTotalGB,
+			"free_gb":  metrics.DiskFreeGB,
+			"used_pct": metrics.DiskUsedPct,
+		},
+		"system_plugins": []map[string]any{
+			{
+				"name":   "ireader-llrp-daemon",
+				"pid":    metrics.IReaderPID,
+				"status": metrics.IReaderStatus,
+			},
+		},
+		"storage": map[string]any{
+			"message_total": totalMsgs,
+			"message_counts_by_type": []map[string]any{
+				{"type": "RawTagRead", "total": a.readsCount.Load()},
+				{"type": "NodePresence", "total": a.presenceCount.Load()},
+				{"type": "MessageState", "total": a.stateCount.Load()},
+				{"type": "ErrorEvent", "total": a.errorCount.Load()},
+			},
+		},
+		"system_resources": map[string]any{
+			"cpu_pct":        metrics.CPUUsagePct,
+			"memory_pct":     metrics.MemUsedPct,
+			"disk_pct":       metrics.DiskUsedPct,
+			"uptime_seconds": uptimeSec,
+		},
+	}
+
+	envelope := BinduEnvelope{
+		Type:       "MessageState",
+		Group:      "mesh",
+		Producer:   a.nodeID,
+		Node:       a.nodeID,
+		NodeOrigin: a.nodeID,
+		NodeDest:   "root",
+		UptimeSec:  uptimeSec,
+		User:       "mesh:" + a.nodeID,
+		When:       nowUTC,
+		Fields:     payloadFields,
+	}
+
+	data, err := json.Marshal(envelope)
+	if err != nil {
+		return err
+	}
+
+	if err := a.publishMQTT("bindu/in", data); err != nil {
+		return err
+	}
+	a.stateCount.Add(1)
+	return nil
+}
+
+func (a *Agent) sendMessagePing() error {
+	nowUTC := time.Now().UTC().Format(time.RFC3339)
+
+	// Enviar PINGREQ nativo a nivel de protocolo MQTT para mantener el socket activo
+	a.mqttMu.Lock()
+	if a.mqttConn != nil {
+		a.mqttConn.Write([]byte{0xC0, 0x00})
+	}
+	a.mqttMu.Unlock()
+
+	// Enviar mensaje semántico MessagePing con fields: {} canónico de Bindu
+	envelope := BinduEnvelope{
+		Type:     "MessagePing",
+		Group:    "system",
+		Producer: a.nodeID,
+		Src:      a.nodeID,
+		NodeDest: "root",
+		When:     nowUTC,
+		Fields:   map[string]any{},
+	}
+
+	data, err := json.Marshal(envelope)
+	if err != nil {
+		return err
+	}
+
+	if err := a.publishMQTT("bindu/in", data); err != nil {
+		return err
+	}
+	a.pingCount.Add(1)
+	return nil
+}
+
+func (a *Agent) sendErrorEvent(errType, reason, payloadStr string) {
+	nowUTC := time.Now().UTC().Format(time.RFC3339)
+	a.errorCount.Add(1)
+
+	envelope := BinduEnvelope{
+		Type:       "ErrorEvent",
+		Group:      "mesh",
+		Producer:   a.nodeID,
+		NodeOrigin: a.nodeID,
+		NodeDest:   "root",
+		When:       nowUTC,
+		Fields: map[string]any{
+			"client_id":       a.nodeID,
+			"error_type":      errType,
+			"group_id":        "mesh",
+			"origin_producer": a.nodeID,
+			"payload":         payloadStr,
+			"reason":          reason,
+			"timestamp":       nowUTC,
+			"topic":           "bindu/in/raw/rfid/idx4000",
+			"username":        "system",
+		},
+	}
+
+	data, err := json.Marshal(envelope)
+	if err == nil {
+		_ = a.publishMQTT("bindu/in", data)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// RECOLECCIÓN DE MÉTRICAS LINUX / ARMv7 DEL HARDWARE SENSORMATIC
+// -----------------------------------------------------------------------------
+
+type SystemMetrics struct {
+	CPUCores      int
+	CPULoad1m     float64
+	CPULoad5m     float64
+	CPUUsagePct   float64
+	MemTotalMB    float64
+	MemAvailMB    float64
+	MemUsedPct    float64
+	DiskPath      string
+	DiskTotalGB   float64
+	DiskFreeGB    float64
+	DiskUsedPct   float64
+	IReaderPID    int
+	IReaderStatus string
+}
+
+func (a *Agent) collectLinuxSystemMetrics() SystemMetrics {
+	m := SystemMetrics{
+		CPUCores:      2,
+		CPULoad1m:     0.10,
+		CPULoad5m:     0.10,
+		CPUUsagePct:   5.0,
+		MemTotalMB:    1024.0,
+		MemAvailMB:    750.0,
+		MemUsedPct:    26.7,
+		DiskPath:      "/",
+		DiskTotalGB:   4.0,
+		DiskFreeGB:    2.8,
+		DiskUsedPct:   30.0,
+		IReaderPID:    0,
+		IReaderStatus: "running",
+	}
+
+	// 1. Load averages
+	if data, err := os.ReadFile("/proc/loadavg"); err == nil {
+		parts := strings.Fields(string(data))
+		if len(parts) >= 2 {
+			if l1, err := strconv.ParseFloat(parts[0], 64); err == nil {
+				m.CPULoad1m = l1
+				m.CPUUsagePct = math.Min(100.0, (l1/float64(m.CPUCores))*100.0)
+			}
+			if l5, err := strconv.ParseFloat(parts[1], 64); err == nil {
+				m.CPULoad5m = l5
+			}
+		}
+	}
+
+	// 2. Memory info
+	if data, err := os.ReadFile("/proc/meminfo"); err == nil {
+		var totalKb, availKb, freeKb float64
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			if len(fields) < 2 {
+				continue
+			}
+			val, _ := strconv.ParseFloat(fields[1], 64)
+			switch fields[0] {
+			case "MemTotal:":
+				totalKb = val
+			case "MemAvailable:":
+				availKb = val
+			case "MemFree:":
+				freeKb = val
+			}
+		}
+		if totalKb > 0 {
+			m.MemTotalMB = math.Round((totalKb/1024.0)*10) / 10
+			if availKb == 0 {
+				availKb = freeKb
+			}
+			m.MemAvailMB = math.Round((availKb/1024.0)*10) / 10
+			usedKb := totalKb - availKb
+			m.MemUsedPct = math.Round(((usedKb/totalKb)*100.0)*10) / 10
+		}
+	}
+
+	// 3. Disk stats (preferir /customer_apps o fallback a /)
+	diskTarget := "/customer_apps"
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(diskTarget, &stat); err != nil {
+		diskTarget = "/"
+		_ = syscall.Statfs(diskTarget, &stat)
+	}
+	m.DiskPath = diskTarget
+	if stat.Blocks > 0 {
+		totalBytes := stat.Blocks * uint64(stat.Bsize)
+		freeBytes := stat.Bfree * uint64(stat.Bsize)
+		m.DiskTotalGB = math.Round((float64(totalBytes)/(1024*1024*1024))*100) / 100
+		m.DiskFreeGB = math.Round((float64(freeBytes)/(1024*1024*1024))*100) / 100
+		usedBytes := totalBytes - freeBytes
+		m.DiskUsedPct = math.Round(((float64(usedBytes)/float64(totalBytes))*100.0)*10) / 10
+	}
+
+	// 4. ireader status
+	if a.llrpConn != nil {
+		m.IReaderStatus = "running"
+	} else {
+		m.IReaderStatus = "disconnected"
+	}
+
+	return m
+}
+
+// -----------------------------------------------------------------------------
+// CONEXIÓN Y TRANSPORTE MQTT mTLS
+// -----------------------------------------------------------------------------
 
 func (a *Agent) connectMQTT() error {
 	a.mqttMu.Lock()
@@ -264,7 +691,7 @@ func (a *Agent) connectMQTT() error {
 	varHdr = append(varHdr, connectFlags, 0x00, 0x3C)
 
 	var payload []byte
-	payload = append(payload, encodeMqttString(a.readerID)...)
+	payload = append(payload, encodeMqttString(a.nodeID)...)
 	if a.mqttUser != "" {
 		payload = append(payload, encodeMqttString(a.mqttUser)...)
 	}
@@ -314,8 +741,15 @@ func (a *Agent) publishMQTT(topic string, payload []byte) error {
 	a.mqttConn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 	_, err := a.mqttConn.Write(pkt)
 	a.mqttConn.SetWriteDeadline(time.Time{})
+	if err != nil {
+		a.triggerReconnect(fmt.Sprintf("Error al escribir paquete MQTT en topic %s: %v", topic, err))
+	}
 	return err
 }
+
+// -----------------------------------------------------------------------------
+// GESTIÓN DE PROTOCOLO LLRP CON IREPORTS NATIVAS
+// -----------------------------------------------------------------------------
 
 func (a *Agent) connectLLRP() error {
 	conn, err := net.DialTimeout("tcp", a.llrpAddr, 3*time.Second)
@@ -352,8 +786,6 @@ func (a *Agent) setupAndStartROSpec() error {
 	l := binary.BigEndian.Uint32(hdr[2:6])
 	body := make([]byte, int(l)-10)
 	io.ReadFull(a.llrpConn, body)
-	t := binary.BigEndian.Uint16(hdr[0:2]) & 0x03FF
-	fmt.Printf("[LLRP] DELETE_ROSPEC resp type=%d, len=%d\n", t, l)
 
 	// ADD_ROSPEC 1
 	a.llrpConn.Write(encodeLLRP(20, 102, buildStrictROSpec(1, a.antennaID, a.powerDbm)))
@@ -361,8 +793,6 @@ func (a *Agent) setupAndStartROSpec() error {
 	l = binary.BigEndian.Uint32(hdr[2:6])
 	body = make([]byte, int(l)-10)
 	io.ReadFull(a.llrpConn, body)
-	t = binary.BigEndian.Uint16(hdr[0:2]) & 0x03FF
-	fmt.Printf("[LLRP] ADD_ROSPEC resp type=%d, len=%d\n", t, l)
 
 	// ENABLE_ROSPEC 1
 	a.llrpConn.Write(encodeLLRP(24, 103, uint32Bytes(1)))
@@ -370,8 +800,6 @@ func (a *Agent) setupAndStartROSpec() error {
 	l = binary.BigEndian.Uint32(hdr[2:6])
 	body = make([]byte, int(l)-10)
 	io.ReadFull(a.llrpConn, body)
-	t = binary.BigEndian.Uint16(hdr[0:2]) & 0x03FF
-	fmt.Printf("[LLRP] ENABLE_ROSPEC resp type=%d, len=%d\n", t, l)
 
 	// START_ROSPEC 1
 	a.llrpConn.Write(encodeLLRP(22, 104, uint32Bytes(1)))
@@ -379,16 +807,22 @@ func (a *Agent) setupAndStartROSpec() error {
 	l = binary.BigEndian.Uint32(hdr[2:6])
 	body = make([]byte, int(l)-10)
 	io.ReadFull(a.llrpConn, body)
-	t = binary.BigEndian.Uint16(hdr[0:2]) & 0x03FF
-	fmt.Printf("[LLRP] START_ROSPEC resp type=%d, len=%d\n", t, l)
 
 	return nil
 }
 
 func (a *Agent) readLoop() error {
 	hdr := make([]byte, 10)
-	for a.running {
+	for a.running && a.aborted.Load() == 0 {
+		if a.llrpConn == nil {
+			return fmt.Errorf("llrpConn cerrado")
+		}
+
+		_ = a.llrpConn.SetReadDeadline(time.Now().Add(1 * time.Second))
 		if _, err := io.ReadFull(a.llrpConn, hdr); err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				continue
+			}
 			return err
 		}
 
@@ -399,6 +833,7 @@ func (a *Agent) readLoop() error {
 		}
 
 		body := make([]byte, int(msgLen)-10)
+		_ = a.llrpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 		if _, err := io.ReadFull(a.llrpConn, body); err != nil {
 			return err
 		}
@@ -536,9 +971,10 @@ func (a *Agent) handleTagItem(item RawTagItem) {
 	a.tracker.mu.Unlock()
 
 	// Visualización live en consola
-	fmt.Printf("[RAW INGRESS #%-4d] 📡 MAC: %s | ReaderID: %s | EPC: %s | RSSI: %5.1f dBm | Ant: %d | Ch: %d | Tx: %d dBm\n",
-		hits, a.macAddr, a.readerID, item.EPCHex, item.PeakRSSI, item.AntennaID, item.Channel, a.powerDbm)
+	fmt.Printf("[RAW INGRESS #%-4d] 📡 MAC: %s | NodeID: %s | EPC: %s | RSSI: %5.1f dBm | Ant: %d | Ch: %d | Tx: %d dBm\n",
+		hits, a.macAddr, a.nodeID, item.EPCHex, item.PeakRSSI, item.AntennaID, item.Channel, a.powerDbm)
 
+	a.readsCount.Add(1)
 	go a.emitRawRead(item.EPCHex, uint16(item.AntennaID), uint16(item.Channel), item.PeakRSSI, item.Timestamp)
 }
 
@@ -547,7 +983,7 @@ func (a *Agent) emitRawRead(epc string, antennaID, channelIndex uint16, rssi flo
 
 	rawPayload := map[string]any{
 		"mac":        a.macAddr,
-		"reader_id":  a.readerID,
+		"reader_id":  a.nodeID,
 		"antenna":    int(antennaID),
 		"epc":        epc,
 		"rssi":       rssi,
@@ -565,6 +1001,10 @@ func (a *Agent) emitRawRead(epc string, antennaID, channelIndex uint16, rssi flo
 		fmt.Printf("[MQTT] ⚠️ Error publicando raw ingress: %v\n", err)
 	}
 }
+
+// -----------------------------------------------------------------------------
+// UTILIDADES LLRP & MQTT BINARIAS
+// -----------------------------------------------------------------------------
 
 func encodeLLRP(msgType uint16, msgID uint32, payload []byte) []byte {
 	totalLen := 10 + len(payload)
@@ -598,10 +1038,9 @@ func buildStrictROSpec(roSpecID uint32, antennaID, powerDbm uint16) []byte {
 	boundaryTLV := buildTLV(178, boundary.Bytes())
 
 	var aiSpec bytes.Buffer
-	// Si antennaID == 0 se activan todos los puertos; si es > 0, el puerto específico
 	var antList []byte
 	if antennaID == 0 {
-		antList = []byte{0, 1, 0, 0} // Todos los puertos de antena (1, 2, 3, 4)
+		antList = []byte{0, 1, 0, 0} // Todos los puertos
 	} else {
 		antList = []byte{0, 1, byte(antennaID >> 8), byte(antennaID & 0xFF)}
 	}
@@ -609,20 +1048,17 @@ func buildStrictROSpec(roSpecID uint32, antennaID, powerDbm uint16) []byte {
 	aiStopTrig := make([]byte, 5)
 	aiSpec.Write(buildTLV(184, aiStopTrig))
 
-	// RFTransmitter (Type 224): HopTableID=0, ChannelIndex=0, TransmitPower=powerDbm
 	rfTrans := make([]byte, 6)
 	binary.BigEndian.PutUint16(rfTrans[0:2], 0)
 	binary.BigEndian.PutUint16(rfTrans[2:4], 0)
 	binary.BigEndian.PutUint16(rfTrans[4:6], powerDbm)
 	rfTransTLV := buildTLV(224, rfTrans)
 
-	// AntennaConfiguration (Type 222): AntennaID=1 + RFTransmitter
 	antConfig := make([]byte, 2)
 	binary.BigEndian.PutUint16(antConfig[0:2], 1)
 	antConfig = append(antConfig, rfTransTLV...)
 	antConfigTLV := buildTLV(222, antConfig)
 
-	// InventoryParameterSpec (Type 186): SpecID=1, Protocol=1 (EPC Class 1 Gen 2) + AntennaConfiguration
 	var invParam bytes.Buffer
 	invParam.Write([]byte{0, 1, 1})
 	invParam.Write(antConfigTLV)

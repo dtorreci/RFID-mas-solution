@@ -72,13 +72,13 @@ func main() {
 	io.ReadFull(conn, body)
 
 	fmt.Println("✔ Lector activado y emitiendo campo RF en las 4 antenas.")
-	fmt.Println("Capturando tags durante 6 segundos...\n")
+	fmt.Println("Capturando tags durante 10 segundos...\n")
 
 	var mu sync.Mutex
 	tagMap := make(map[string]*DecodedTagEvent)
 	totalReports := 0
 
-	_ = conn.SetDeadline(time.Now().Add(6 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
 	for {
 		if _, err := io.ReadFull(conn, hdr); err != nil {
 			break
@@ -291,7 +291,7 @@ func buildStrictROSpec(roSpecID uint32) []byte {
 	boundaryTLV := buildTLV(178, boundary.Bytes())
 
 	var aiSpec bytes.Buffer
-	antList := []byte{0, 1, 0, 0} // All antennas
+	antList := []byte{0, 4, 0, 1, 0, 2, 0, 3, 0, 4} // Las 4 antenas físicas (1, 2, 3, 4)
 	aiSpec.Write(antList)
 	aiStopTrig := make([]byte, 5) // Null stop
 	aiSpec.Write(buildTLV(184, aiStopTrig))

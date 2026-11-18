@@ -1,13 +1,13 @@
 {
   "bundle_version": "1.0.0",
-  "exported_at": "2026-11-13T13:07:09Z",
+  "exported_at": "2026-11-18T14:46:38Z",
   "solution": {
     "$type": "MASSolutionSet",
-    "$id": "sol-rfid-industrial-proximity-guardian-mas-1794575229",
+    "$id": "sol-rfid-industrial-proximity-guardian-mas-1795013198",
     "$group": "solution",
     "$producer": "rfid-industrial-proximity-guardian-mas",
     "$user": "dtorreci",
-    "$when": "2026-11-13T13:07:09Z",
+    "$when": "2026-11-18T14:46:38Z",
     "fields": {
       "solution_id": "rfid-industrial-proximity-guardian-mas",
       "name": "Sensormatic IDX-4000 RFID Industrial Proximity Guardian \u0026 Multilingual WhatsApp Alert MAS",

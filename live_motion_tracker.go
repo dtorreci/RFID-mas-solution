@@ -194,7 +194,7 @@ func main() {
 					if res, err := DecodeEPC(item.EPCHex); err == nil && res.GTIN14 != "" {
 						gtin = res.GTIN14
 					}
-					isTarget := (gtin == TargetGTIN || item.EPCHex == TargetGTIN)
+					isTarget := true
 					tr = &TagMotionTracker{
 						EPCHex:       item.EPCHex,
 						GTIN:         gtin,

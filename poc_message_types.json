@@ -1569,6 +1569,18 @@
           "type": "string",
           "required": true,
           "description": "Marca de tiempo UTC del evento"
+        },
+        {
+          "name": "device_mac",
+          "type": "string",
+          "required": false,
+          "description": "Dirección MAC del lector RFID hardware"
+        },
+        {
+          "name": "reader_id",
+          "type": "string",
+          "required": false,
+          "description": "Identificador único del lector RFID"
         }
       ]
     }
