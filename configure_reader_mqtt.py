@@ -23,7 +23,7 @@ fields = [
     ('TopicVersion', ''),
     ('MQTT_EnabledState', '1'),
     ('MQTTEnable', 'on'),
-    ('MQTT_Hostname', '192.168.1.111'),
+    ('MQTT_Hostname', 'bindu.decn.casa'),
     ('MQTT_Port', '1883'),
     ('MQTT_Topic_Version', '0'),
     ('MQTT_BT_ClientID', '0000idx'),

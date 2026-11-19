@@ -13,8 +13,8 @@ sleep 5
 while true; do
     echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [WATCHDOG] Iniciando Bindu Edge Agent..." >> /customer_apps/edge_agent.log
     /customer_apps/idx4000_edge_agent \
-        -mqtt "192.168.1.111:1883" \
-        -root-host "192.168.1.111" \
+        -mqtt "bindu.decn.casa:1883" \
+        -root-host "bindu.decn.casa" \
         -root-https-port 8444 \
         -root-http-port 8080 \
         -tls-dir "/customer_apps/tls" \

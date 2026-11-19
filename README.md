@@ -33,7 +33,7 @@ flowchart TB
 
         subgraph S3["📍 EN CANAL MESH DISTRIBUIDO<br/>(mTLS Autenticado 1883)"]
             MESH["🔒 Túnel Mesh mTLS Cifrado<br/>Zero Conexiones Directas MQTT"]
-            ROOT_ENTRY["🏢 bindu-root Listener<br/>(Puerto 1883 / 192.168.1.111)"]
+            ROOT_ENTRY["🏢 bindu-root Listener<br/>(Puerto 1883 / bindu.decn.casa)"]
             
             MESH --> ROOT_ENTRY
         end
@@ -124,11 +124,11 @@ flowchart TB
 | **`ireader` (LLRP)** | Driver de hardware de los 4 puertos RF | **`NODE`** (Lector Sensormatic IDX-4000) | `/usr/bin/ireader` (daemon nativo) | TCP Loopback `127.0.0.1:5084` |
 | **`idx4000_edge_agent`** | Agente de borde nativo Bindu 0.27.520 (ARMv7) | **`NODE`** (Lector Sensormatic IDX-4000) | `/customer_apps/idx4000_edge_agent` | LLRP Loopback + mTLS Mesh hacia `ROOT:1883` |
 | **Canal Mesh mTLS** | Túnel seguro de datos de la malla | **`RED MESH`** (`node` $\leftrightarrow$ `root`) | Puerto TCP `1883` (mTLS mutuo) | Protocolo binario Bindu Mesh (Zero-Plaintext Wire) |
-| **`bindu-root`** | Gateway orquestador central y ledger SQLite | **`ROOT`** (Servidor Gateway `192.168.1.111`) | `/home/dtp/.bindu/root/bindu-root` | SQLite `bindu_messages.db`, Consola 8080 |
+| **`bindu-root`** | Gateway orquestador central y ledger SQLite | **`ROOT`** (Servidor Gateway `bindu.decn.casa`) | `/home/dtp/.bindu/root/bindu-root` | SQLite `bindu_messages.db`, Consola 8080 |
 | **Pipeline Google CEL** | Inferencia cinemática determinista (< 1 ms) | **`ROOT`** (In-memory en daemon `bindu-root`) | `CELReactorPlugin` (in-process) | Google CEL (`RawTagRead` $\to$ `TagRadialMotion`) |
 | **Semantic AI Reactor** | Adaptador y validador del contrato de IA | **`ROOT`** (In-memory en daemon `bindu-root`) | `SemanticReactorAdapter` (in-process) | Coerción de esquema `SendWhatsAppRequest` |
-| **Ollama SLM Local** | Inferencia de lenguaje natural (`qwen2.5:1.5b`) | **`ROOT`** (Servidor Gateway `192.168.1.111`) | Demonio local `ollama serve` | HTTP REST `http://localhost:11434/v1` |
-| **`bindu-whatsapp-plugin`** | Despacho a WhatsApp y control anti-spam | **`ROOT`** (Servidor Gateway `192.168.1.111`) | Plugin BPR supervisado por `bindu-root` | BPR Stdio Pipes + whatsmeow WebSockets |
+| **Ollama SLM Local** | Inferencia de lenguaje natural (`qwen2.5:1.5b`) | **`ROOT`** (Servidor Gateway `bindu.decn.casa`) | Demonio local `ollama serve` | HTTP REST `http://localhost:11434/v1` |
+| **`bindu-whatsapp-plugin`** | Despacho a WhatsApp y control anti-spam | **`ROOT`** (Servidor Gateway `bindu.decn.casa`) | Plugin BPR supervisado por `bindu-root` | BPR Stdio Pipes + whatsmeow WebSockets |
 | **Red WhatsApp Web** | Entrega móvil a los smartphones | **`EXTERNO`** (Infraestructura Meta) | Servidores de WhatsApp $\to$ App Móvil | Protocolo Noise / Signal E2EE |
 
 ---
@@ -170,7 +170,7 @@ flowchart TB
   - Los campos de métricas (`readsCount`, `presenceCount`, `stateCount`, `pingCount`, `errorCount`) se definen con tipos `atomic.Int64` ubicados al inicio de la estructura de datos en Go.
 - **Autoarranque Nativo como `customer_app`**:
   - Binario estático compilado en ARMv7: [edge_agent/idx4000_edge_agent](file:///home/dtp/solutions/RFID-mas-solution/edge_agent/idx4000_edge_agent).
-  - Wrapper supervisor en `/customer_apps/customerApp` integrado en el ciclo de inicio del firmware del lector: se levanta automáticamente tras el arranque del kernel Linux 5.15, conecta por loopback TCP al demonio nativo `ireader` (LLRP `127.0.0.1:5084`), configura la ROSpec de 18 dBm en la antena 1 (Keonn Advan-CP1 EU) y establece el túnel mTLS autenticado con Bindu Root (`192.168.1.111:1883`).
+  - Wrapper supervisor en `/customer_apps/customerApp` integrado en el ciclo de inicio del firmware del lector: se levanta automáticamente tras el arranque del kernel Linux 5.15, conecta por loopback TCP al demonio nativo `ireader` (LLRP `127.0.0.1:5084`), configura la ROSpec de 18 dBm en la antena 1 (Keonn Advan-CP1 EU) y establece el túnel mTLS autenticado con Bindu Root (`bindu.decn.casa:1883`).
   - Supervisor resiliente: cuenta con un bucle `while true` que reconecta y reinicia el agente ante cualquier interrupción sin requerir reiniciar el lector.
 - **Zero-Plaintext Wire Guarantee**: Ningún dato ni comando circula en texto plano por la red. La autenticación y el transporte se ejecutan exclusivamente mediante TLS mutuo (mTLS con certificados x509 generados por la CA interna de Bindu).
 
@@ -417,8 +417,8 @@ ftp.quit()
 
 # 4. Flags de ejecución soportados (con auto-enrolamiento y renovación mTLS)
 /customer_apps/idx4000_edge_agent \
-  -mesh-host "192.168.1.111" -mesh-port 1883 \
-  -root-host "192.168.1.111" -root-https-port 8444 -root-http-port 8080 \
+  -mesh-host "bindu.decn.casa" -mesh-port 1883 \
+  -root-host "bindu.decn.casa" -root-https-port 8444 -root-http-port 8080 \
   -enroll-user "enrollment_agent" -enroll-pass "HhAuth2026!" \
   -tls-dir "/customer_apps/tls" \
   -user dtorreci -pass "BinduMaster2026!"
@@ -485,7 +485,7 @@ Para incorporar nuevos lectores RFID Sensormatic IDX-4000 en fábrica, almacén 
    - Ejecuta `PreflightNode()` validando autorización contra el Root Gateway.
    - Genera par de claves RSA-2048 y emite CSR PKCS#10 a `/api/v1/tls/sign-node`.
    - Descarga y almacena el certificado mTLS en `/customer_apps/tls/server.crt`.
-   - Establece enlace cifrado mTLS a `192.168.1.111:1883` e inicia lecturas LLRP en tiempo real.
+   - Establece enlace cifrado mTLS a `bindu.decn.casa:1883` e inicia lecturas LLRP en tiempo real.
 
 
 ---

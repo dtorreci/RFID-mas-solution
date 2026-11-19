@@ -35,7 +35,7 @@ var clientKeyPEM []byte
 
 const (
 	DefaultLLRPAddr = "127.0.0.1:5084"
-	DefaultMQTTAddr = "192.168.1.111:1883"
+	DefaultMQTTAddr = "bindu.decn.casa:1883"
 	CanonicalNodeID = "idx4000-00-50-f9-d1-0a-2b"
 	TargetGTIN      = "07621806175810"
 	TargetEPCHex    = "30b5d132b8112b42f9b59b2a"
@@ -184,7 +184,7 @@ func main() {
 		if h, _, err := net.SplitHostPort(*mqttAddr); err == nil {
 			rootHost = h
 		} else {
-			rootHost = "192.168.1.111"
+			rootHost = "bindu.decn.casa"
 		}
 	}
 

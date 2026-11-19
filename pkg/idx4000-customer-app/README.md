@@ -22,7 +22,7 @@ Este paquete contiene todo lo necesario para incorporar nuevos lectores RFID **S
 Antes de conectar el lector por primera vez, el administrador de Bindu debe autorizar su identificador en la topología de la red:
 
 1. Obtener la dirección MAC del nuevo lector (impresa en la etiqueta de código de barras del dispositivo o visible en el router DHCP, ej: `00:50:F9:88:99:AA`).
-2. En el servidor central Bindu Root (`192.168.1.111`), añadir el nodo al archivo `/home/dtp/.bindu/root/runtime/config/mesh.json` dentro de `root.children`:
+2. En el servidor central Bindu Root (`bindu.decn.casa`), añadir el nodo al archivo `/home/dtp/.bindu/root/runtime/config/mesh.json` dentro de `root.children`:
 
 ```json
 {
@@ -75,12 +75,12 @@ Si el técnico prefiere usar un cliente gráfico como **FileZilla** o **WinSCP**
 1. **Detección Automática**: El firmware del lector detecta `/customer_apps/customerApp` y lo lanza como servicio supervisor.
 2. **Identidad Inmutable**: El agente lee su dirección MAC física (`eth0`) y genera su NodeID (`idx4000-MAC`).
 3. **Preflight & Auto-Enrollment (Bindu 0.27.520)**:
-   - Contacta con `POST https://192.168.1.111:8444/api/v1/tls/preflight-node`.
+   - Contacta con `POST https://bindu.decn.casa:8444/api/v1/tls/preflight-node`.
    - Genera localmente su clave RSA-2048 y emite una solicitud CSR PKCS#10.
    - Recibe y almacena su certificado mTLS en `/customer_apps/tls/server.crt`.
 4. **Operación en Vivo**:
    - Conecta a LLRP local (`127.0.0.1:5084`), fija la antena 1 a 18 dBm.
-   - Establece el enlace cifrado mTLS con Bindu Root (`192.168.1.111:1883`).
+   - Establece el enlace cifrado mTLS con Bindu Root (`bindu.decn.casa:1883`).
    - Comienza a emitir `RawTagRead`, `NodePresence`, `MessageState` y `MessagePing`.
 
 ---
