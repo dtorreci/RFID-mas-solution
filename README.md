@@ -122,7 +122,7 @@ flowchart TB
 | Componente / Proceso | Rol Funcional | Dónde se Ejecuta | Binario / Servicio | Protocolo / Interfaz |
 | :--- | :--- | :--- | :--- | :--- |
 | **`ireader` (LLRP)** | Driver de hardware de los 4 puertos RF | **`NODE`** (Lector Sensormatic IDX-4000) | `/usr/bin/ireader` (daemon nativo) | TCP Loopback `127.0.0.1:5084` |
-| **`idx4000_edge_agent`** | Agente de borde nativo Bindu 0.17.520 (ARMv7) | **`NODE`** (Lector Sensormatic IDX-4000) | `/customer_apps/idx4000_edge_agent` | LLRP Loopback + mTLS Mesh hacia `ROOT:1883` |
+| **`idx4000_edge_agent`** | Agente de borde nativo Bindu 0.27.520 (ARMv7) | **`NODE`** (Lector Sensormatic IDX-4000) | `/customer_apps/idx4000_edge_agent` | LLRP Loopback + mTLS Mesh hacia `ROOT:1883` |
 | **Canal Mesh mTLS** | Túnel seguro de datos de la malla | **`RED MESH`** (`node` $\leftrightarrow$ `root`) | Puerto TCP `1883` (mTLS mutuo) | Protocolo binario Bindu Mesh (Zero-Plaintext Wire) |
 | **`bindu-root`** | Gateway orquestador central y ledger SQLite | **`ROOT`** (Servidor Gateway `192.168.1.111`) | `/home/dtp/.bindu/root/bindu-root` | SQLite `bindu_messages.db`, Consola 8080 |
 | **Pipeline Google CEL** | Inferencia cinemática determinista (< 1 ms) | **`ROOT`** (In-memory en daemon `bindu-root`) | `CELReactorPlugin` (in-process) | Google CEL (`RawTagRead` $\to$ `TagRadialMotion`) |
@@ -138,22 +138,23 @@ flowchart TB
 ### 2.1. Nodo Bindu Edge en Sensormatic IDX-4000
 - **Hardware & SO**: Procesador Freescale i.MX6 Dual/Quad (ARMv7 Cortex-A7 32-bit), Linux 5.15 LTS, lector RFID de 4 puertos RF Sensormatic IDX-4000 (`192.168.1.143`).
 - **Strong Identity (`idx4000-00-50-f9-d1-0a-2b`)**: Identidad criptográfica vinculada a la dirección MAC física del adaptador Ethernet `eth0` (`00:50:f9:d1:0a:2b`), registrada formalmente en la topología `mesh.json`. Resuelve de raíz problemas de asignación dinámica de IPs y garantiza que las claves mTLS del nodo no colisionen en la malla.
-- **Enrolamiento Autónomo Zero-Touch PKCS#10 CSR (Inspirado en `HH-mas-solution`)**:
+- **Enrolamiento Autónomo Zero-Touch PKCS#10 CSR (Estándar Bindu 0.27.520)**:
   - Implementado de forma nativa en Go en [edge_agent/enrollment.go](file:///home/dtp/solutions/RFID-mas-solution/edge_agent/enrollment.go) mediante la clase `EnrollmentManager`.
+  - **Verificación Preflight (`POST /api/v1/tls/preflight-node`):** Comprobación obligatoria previa al aprovisionamiento para validar que el `node_id` esté declarado en la topología de la malla (`mesh.json`) y descartar conflictos de conexión activa.
   - **Generación Local de Clave Privada (Zero-Leakage):** Genera on-device una clave RSA de 2048 bits con entropía criptográfica (`crypto/rand`). La clave privada nunca viaja por la red ni sale del lector (`server.key` con permisos `0600`).
   - **CSR PKCS#10 Formal:** Emite una solicitud de firma con `CommonName = <nodeId>` y `Organization = Bindu`.
-  - **Firma Automática con Root Signer:** El lector negocia con el endpoint seguro del Root Gateway (`POST https://<root-host>:8444/api/v1/tls/sign-node`) autenticado con credenciales de agente de enrolamiento (`enrollment_agent`). El Root emite el certificado X.509 (`server.crt` con permisos `0644`) firmado por la CA interna de la malla (`bindu-mesh-ca`).
+  - **Firma Automática con Root Signer:** El lector negocia con el endpoint seguro del Root Gateway (`POST https://<root-host>:8444/api/v1/tls/sign-node`) autenticado con credenciales de agente de enrolamiento (`enrollment_agent` / `X-Enrollment-Token`). El Root emite el certificado X.509 (`server.crt` con permisos `0644`) firmado por la CA interna de la malla (`bindu-mesh-ca`).
   - **Persistencia y Reutilización Atómica:** Las credenciales se almacenan en `/customer_apps/tls/` (`server.key`, `server.crt`, `ca.crt`). En arranques posteriores, valida la vigencia temporal y el Subject CN sin solicitar firmas redundantes.
-  - **Renovación Silenciosa en Background:** Un ticker en background cada 12 horas evalúa la validez restante; si el certificado expira en menos de 30 días (< 20% de vida útil), genera un nuevo par de claves y renueva el certificado en caliente sin interrumpir la operación del lector.
-- **Arquitectura Bottom-Up Invariable**: Siguiendo las directrices canónicas de Bindu 0.17.520 y la documentación de arquitectura (`GEMINI.md` / `BINDU.md`), el nodo de borde emite toda su telemetría y eventos de abajo hacia arriba (*Bottom-Up*):
+  - **Renovación Silenciosa en Background (Bindu 0.27.520):** Un ticker en background cada 12 horas evalúa la validez restante; si el certificado expira en menos de 30 días (< 20% de vida útil), negocia con `/api/v1/tls/renew-node` (con fallback transparente a `/sign-node`) y regenera claves en caliente sin interrumpir la operación del lector.
+- **Arquitectura Bottom-Up Invariable**: Siguiendo las directrices canónicas de Bindu 0.27.520 y la documentación de arquitectura (`GEMINI.md` / `BINDU.md`), el nodo de borde emite toda su telemetría y eventos de abajo hacia arriba (*Bottom-Up*):
   - Enrutamiento estricto: `routing: ["local", "parent"]`.
   - Prohibido terminantemente el enrutamiento `"child"` desde nodos hoja hacia el Gateway.
   - Ingress Topic canónico: `bindu/in` para eventos de sistema y `bindu/in/raw/rfid/idx4000` para capturas de tags.
-- **Implementación Canónica de System Event Types (Bindu 0.17.520)**:
+- **Implementación Canónica de System Event Types (Bindu 0.27.520)**:
   El agente de borde [edge_agent/main.go](file:///home/dtp/solutions/RFID-mas-solution/edge_agent/main.go) incorpora los 4 tipos de eventos de sistema oficiales:
   1. **`NodePresence` (Heartbeat cada 60s)**:
      - Notifica al Root Gateway la presencia y disponibilidad del nodo en la malla.
-     - Payload completo con IPs activas (`192.168.1.143:1883`, `10.255.0.2:1883`), alias de hardware, TTL de 5400 segundos y versión de release `0.17.520`.
+     - Payload completo con IPs activas (`192.168.1.143:1883`, `10.255.0.2:1883`), alias de hardware, TTL de 5400 segundos y versión de release `0.27.520`.
   2. **`MessageState` (Telemetría de Recursos cada 30s)**:
      - Inspecciona dinámicamente `/proc/loadavg` (carga a 1m y 5m), `/proc/meminfo` (RAM libre y porcentaje usado), `statfs` del sistema de archivos en `/customer_apps` y el estado operativo del demonio nativo `ireader-llrp-daemon`.
      - Contabiliza en tiempo real el volumen de mensajes acumulados por tipo (`RawTagRead`, `NodePresence`, `MessageState`, `ErrorEvent`).
@@ -263,11 +264,11 @@ flowchart LR
 | **`SendWhatsAppRequest`** | AI: `rfid-ai-copilot-auditor` | BPR: `bindu-whatsapp-plugin` | `phone_number`, `message_text`, `epc_hex`, `reader_mac`, `rssi` |
 | **`SendWhatsAppResult`** | BPR: `bindu-whatsapp-plugin` | Bindu Ledger (SQLite `v_messages`) | `recipient`, `status`, `message_id`, `delivery_timestamp` |
 
-### Eventos Canónicos de Sistema (Bindu 0.17.520 System Events)
+### Eventos Canónicos de Sistema (Bindu 0.27.520 System Events)
 
 | Evento de Sistema | Origen / Frecuencia | Destino | Campos / Contenido |
 | :--- | :--- | :--- | :--- |
-| **`NodePresence`** | `idx4000-00-50-f9-d1-0a-2b` (cada 60s) | `root` (`bindu/in`) | `node_id`, `addresses`, `aliases`, `endpoints`, `version: 0.17.520`, `ttl_seconds: 5400` |
+| **`NodePresence`** | `idx4000-00-50-f9-d1-0a-2b` (cada 60s) | `root` (`bindu/in`) | `node_id`, `addresses`, `aliases`, `endpoints`, `version: 0.27.520`, `ttl_seconds: 5400` |
 | **`MessageState`** | `idx4000-00-50-f9-d1-0a-2b` (cada 30s) | `root` (`bindu/in`) | `identity`, `platform`, `cpu` (load 1m/5m, cores), `memory` (MB, %), `disk` (GB, %), `system_plugins` (`ireader`), `storage` (conteos por tipo) |
 | **`MessagePing`** | `idx4000-00-50-f9-d1-0a-2b` (cada 25s) | `root` (`bindu/in`) | Envelope formal con `fields: {}`, cabeceras `$src`, `$node-dest: root`, `$when`, RTT audit |
 | **`ErrorEvent`** | `idx4000-00-50-f9-d1-0a-2b` (bajo excepción) | `root` (`bindu/in`) | `error_type`, `client_id`, `topic`, `reason`, `payload`, `timestamp` |

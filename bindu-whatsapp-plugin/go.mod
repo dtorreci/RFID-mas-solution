@@ -39,4 +39,4 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 )
 
-replace bindunet => ../../../.bindu/root/releases/0.17.520
+replace bindunet => ../../../.bindu/root/releases/0.27.520

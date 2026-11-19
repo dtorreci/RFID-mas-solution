@@ -41,7 +41,7 @@ const (
 	TargetEPCHex    = "30b5d132b8112b42f9b59b2a"
 	TargetSerial    = "12779363114"
 	AntennaModel    = "Keonn Advan-CP1 EU"
-	BinduVersion    = "0.17.520"
+	BinduVersion    = "0.27.520"
 	MinPublishGap   = 100 * time.Millisecond
 )
 
@@ -381,7 +381,7 @@ func (a *Agent) startSystemEventLoops(stopChan chan struct{}) {
 }
 
 // -----------------------------------------------------------------------------
-// SYSTEM EVENT TYPES: IMPLEMENTACIONES FORMALES CONFORME A BINDU 0.17.520
+// SYSTEM EVENT TYPES: IMPLEMENTACIONES FORMALES CONFORME A BINDU 0.27.520
 // -----------------------------------------------------------------------------
 
 func (a *Agent) sendNodePresence() error {
