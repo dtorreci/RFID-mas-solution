@@ -1,0 +1,25 @@
+#!/bin/sh
+# ==============================================================================
+# SENSORMATIC IDX-4000 / BINDU EDGE AGENT SUPERVISOR
+# Autoarranque como "Customer App" oficial en Sensormatic / Impinj Octane OS
+# ==============================================================================
+
+cd /customer_apps
+
+# Esperar estabilización del subsistema de red y demonio ireader LLRP (puerto 5084)
+sleep 5
+
+# Supervisor en bucle continuo (Watchdog): reinicia el agente si finaliza o falla
+while true; do
+    echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [WATCHDOG] Iniciando Bindu Edge Agent..." >> /customer_apps/edge_agent.log
+    /customer_apps/idx4000_edge_agent \
+        -mqtt "192.168.1.111:1883" \
+        -root-host "192.168.1.111" \
+        -root-https-port 8444 \
+        -root-http-port 8080 \
+        -tls-dir "/customer_apps/tls" \
+        >> /customer_apps/edge_agent.log 2>&1
+
+    echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] [WATCHDOG] El agente se ha detenido. Reiniciando en 5 segundos..." >> /customer_apps/edge_agent.log
+    sleep 5
+done

@@ -437,6 +437,59 @@ print('\n'.join(lines[-25:]))
 
 ---
 
+### 5.7. Paquete Distribuible y Escalado Multi-Lector (Customer App Package)
+
+Para incorporar nuevos lectores RFID Sensormatic IDX-4000 en fábrica, almacén o tiendas sin requerir personal especializado, se ha generado un paquete autocontenido instalable con **Zero-Touch Provisioning**:
+
+- **Paquete comprimido:** [`pkg/idx4000-customer-app-pkg.tar.gz`](file:///home/dtp/solutions/RFID-mas-solution/pkg/idx4000-customer-app-pkg.tar.gz) / [`pkg/idx4000-customer-app-pkg.zip`](file:///home/dtp/solutions/RFID-mas-solution/pkg/idx4000-customer-app-pkg.zip)
+- **Directorio fuente:** [`pkg/idx4000-customer-app/`](file:///home/dtp/solutions/RFID-mas-solution/pkg/idx4000-customer-app/)
+
+#### Procedimiento de Incorporación de Nuevos Nodos:
+
+1. **Alta en Topología Bindu Root (`mesh.json`)**:
+   Obtener la dirección MAC física del nuevo lector (en la etiqueta de código de barras del dispositivo o router DHCP, ej: `00:50:f9:88:99:aa`). Añadir el bloque hijo a `children` en `/home/dtp/.bindu/root/runtime/config/mesh.json`:
+   ```json
+   {
+     "id": "idx4000-00-50-f9-88-99-aa",
+     "name": "IDX4000-0050F98899AA",
+     "slug": "idx4000-00-50-f9-88-99-aa",
+     "connectivity_kind": "gateway",
+     "platform": { "os": "linux", "arch": "armv7" },
+     "plugins": [ "bindu-idx4000-plugin" ],
+     "bindu": {
+       "node_id": "idx4000-00-50-f9-88-99-aa",
+       "channels": {
+         "mesh_mqtt": { "port": 1883 },
+         "mqtt_integration": { "port": 1885 }
+       }
+     }
+   }
+   ```
+
+2. **Despliegue de la Customer App en el Lector (Operador en Campo)**:
+   Entregar el paquete al instalador. Conectado a la misma red local que el lector nuevo:
+   ```bash
+   # Opción 1: Despliegue one-click en Python (Windows/Linux/Mac)
+   python3 deploy.py 192.168.1.150
+
+   # Opción 2: Despliegue en Bash (Linux/macOS)
+   ./deploy.sh 192.168.1.150
+
+   # Opción 3: Manual vía cliente FTP gráfico (FileZilla / WinSCP)
+   # Conectar a ftp://192.168.1.150 (admin / USBB24), subir 'customerApp' e 'idx4000_edge_agent', y reiniciar el lector.
+   ```
+
+3. **Ciclo de Auto-Aprovisionamiento en el Lector**:
+   - El firmware del lector ejecuta `/customer_apps/customerApp` tras arrancar.
+   - El agente detecta su MAC -> deriva su identificador canónico `idx4000-MAC`.
+   - Ejecuta `PreflightNode()` validando autorización contra el Root Gateway.
+   - Genera par de claves RSA-2048 y emite CSR PKCS#10 a `/api/v1/tls/sign-node`.
+   - Descarga y almacena el certificado mTLS en `/customer_apps/tls/server.crt`.
+   - Establece enlace cifrado mTLS a `192.168.1.111:1883` e inicia lecturas LLRP en tiempo real.
+
+
+---
+
 ## 💡 6. Tips & Findings de Ingeniería
 
 1. **Desacoplamiento BPR vs AI:** En arquitecturas de sistemas multi-agente modernos, el plugin de salida jamás debe formatear ni traducir texto estáticamente. Al suprimir `formatAlertMessage` del plugin de WhatsApp, el código Go se redujo a un conector de transporte asíncrono puro, delegando el 100% de la semántica y de la internacionalización en el reactor cognitivo SLM.
