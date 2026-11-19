@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -93,6 +94,7 @@ type Agent struct {
 	startTime     time.Time
 	mqttMu        sync.Mutex
 	reconnectChan chan struct{}
+	enrollment    *EnrollmentManager
 }
 
 type RawTagItem struct {
@@ -158,6 +160,12 @@ func main() {
 	power := flag.Int("power", 18, "Transmit power in dBm (default: 18 dBm)")
 	allTags := flag.Bool("all-tags", true, "Publish all tags (false=filter target EPC only)")
 	nodeIDFlag := flag.String("node-id", "", "Canonical Bindu Node ID (default: derived from MAC or CanonicalNodeID)")
+	rootHostFlag := flag.String("root-host", "", "Bindu Root host (default: derived from -mqtt address)")
+	rootHttpsPort := flag.Int("root-https-port", 8444, "Bindu Root HTTPS TLS Signer API port")
+	rootHttpPort := flag.Int("root-http-port", 8080, "Bindu Root HTTP Console API port")
+	enrollUser := flag.String("enroll-user", "enrollment_agent", "Bindu enrollment agent username")
+	enrollPass := flag.String("enroll-pass", "HhAuth2026!", "Bindu enrollment agent password/token")
+	tlsDir := flag.String("tls-dir", "/customer_apps/tls", "Directory to store autonomous mTLS certificates")
 	flag.Parse()
 
 	mac := getMacAddress()
@@ -171,6 +179,28 @@ func main() {
 		}
 	}
 
+	rootHost := *rootHostFlag
+	if rootHost == "" {
+		if h, _, err := net.SplitHostPort(*mqttAddr); err == nil {
+			rootHost = h
+		} else {
+			rootHost = "192.168.1.111"
+		}
+	}
+
+	enrollment := NewEnrollmentManager(
+		nodeID,
+		rootHost,
+		*rootHttpsPort,
+		*rootHttpPort,
+		*enrollUser,
+		*enrollPass,
+		*tlsDir,
+		caCertPEM,
+		clientCertPEM,
+		clientKeyPEM,
+	)
+
 	fmt.Println("=========================================================================================")
 	fmt.Printf("   🚀 SENSORMATIC IDX-4000 BINDU EDGE AGENT (ARMv7 Native / Bindu %s)\n", BinduVersion)
 	fmt.Printf("   🏷️ Hardware MAC: %s | Canonical Node ID: %s\n", mac, nodeID)
@@ -178,7 +208,8 @@ func main() {
 	fmt.Printf("   🎯 Target GTIN: %s (EPC: %s)\n", TargetGTIN, TargetEPCHex)
 	fmt.Printf("   📦 Raw Ingress Pipeline: bindu/in/raw/rfid/idx4000 (Bottom-Up Telemetry)\n")
 	fmt.Printf("   🛡️ System Event Types: NodePresence, MessageState, MessagePing, ErrorEvent\n")
-	fmt.Printf("   🔒 MQTT Broker: %s (mTLS with Embedded Root CA + Client Cert)\n", *mqttAddr)
+	fmt.Printf("   🔐 Autonomous Enrollment: PKCS#10 CSR -> %s:8444/api/v1/tls/sign-node\n", rootHost)
+	fmt.Printf("   🔒 MQTT Broker: %s (mTLS Zero-Plaintext Wire Guarantee)\n", *mqttAddr)
 	fmt.Println("=========================================================================================")
 
 	agent := &Agent{
@@ -191,6 +222,7 @@ func main() {
 		allTags:       *allTags,
 		mqttUser:      *user,
 		mqttPass:      *pass,
+		enrollment:    enrollment,
 		tracker:       &MotionTracker{},
 		running:       true,
 		startTime:     time.Now(),
@@ -237,6 +269,17 @@ func (a *Agent) triggerReconnect(reason string) {
 }
 
 func (a *Agent) run() error {
+	// Verificar o enrolar credenciales mTLS de forma autónoma antes de conectar
+	fmt.Printf("\n[ENROLLMENT] Verificando estado de credenciales mTLS para nodo '%s'...\n", a.nodeID)
+	if _, err := a.enrollment.ResolveOrEnrollCertificate(); err != nil {
+		fmt.Printf("[ENROLLMENT] ⚠️ Advertencia durante resolución de certificado: %v\n", err)
+	}
+
+	// Iniciar monitor de renovación automática en segundo plano (>80% vida útil / <30 días)
+	a.enrollment.StartBackgroundRenewal(func() {
+		a.triggerReconnect("Certificado mTLS renovado en segundo plano")
+	})
+
 	for a.running {
 		a.aborted.Store(0)
 
@@ -659,13 +702,22 @@ func (a *Agent) connectMQTT() error {
 	defer a.mqttMu.Unlock()
 
 	caCertPool := x509.NewCertPool()
-	if !caCertPool.AppendCertsFromPEM(caCertPEM) {
-		return fmt.Errorf("fallo al cargar ca.crt embebido")
+	// Cargar CA de disco si existe
+	if caDisk, err := os.ReadFile(filepath.Join(a.enrollment.tlsDir, "ca.crt")); err == nil && len(caDisk) > 0 {
+		caCertPool.AppendCertsFromPEM(caDisk)
+	}
+	// Añadir CA raíz de Bindu
+	if len(caCertPEM) > 0 {
+		caCertPool.AppendCertsFromPEM(caCertPEM)
 	}
 
-	cert, err := tls.X509KeyPair(clientCertPEM, clientKeyPEM)
-	if err != nil {
-		return fmt.Errorf("fallo al cargar par de claves mTLS: %w", err)
+	cert := a.enrollment.GetActiveCertificate()
+	if len(cert.Certificate) == 0 {
+		var err error
+		cert, err = a.enrollment.ResolveOrEnrollCertificate()
+		if err != nil {
+			return fmt.Errorf("fallo al resolver certificado mTLS: %w", err)
+		}
 	}
 
 	tlsConfig := &tls.Config{

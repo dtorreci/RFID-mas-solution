@@ -138,6 +138,13 @@ flowchart TB
 ### 2.1. Nodo Bindu Edge en Sensormatic IDX-4000
 - **Hardware & SO**: Procesador Freescale i.MX6 Dual/Quad (ARMv7 Cortex-A7 32-bit), Linux 5.15 LTS, lector RFID de 4 puertos RF Sensormatic IDX-4000 (`192.168.1.143`).
 - **Strong Identity (`idx4000-00-50-f9-d1-0a-2b`)**: Identidad criptográfica vinculada a la dirección MAC física del adaptador Ethernet `eth0` (`00:50:f9:d1:0a:2b`), registrada formalmente en la topología `mesh.json`. Resuelve de raíz problemas de asignación dinámica de IPs y garantiza que las claves mTLS del nodo no colisionen en la malla.
+- **Enrolamiento Autónomo Zero-Touch PKCS#10 CSR (Inspirado en `HH-mas-solution`)**:
+  - Implementado de forma nativa en Go en [edge_agent/enrollment.go](file:///home/dtp/solutions/RFID-mas-solution/edge_agent/enrollment.go) mediante la clase `EnrollmentManager`.
+  - **Generación Local de Clave Privada (Zero-Leakage):** Genera on-device una clave RSA de 2048 bits con entropía criptográfica (`crypto/rand`). La clave privada nunca viaja por la red ni sale del lector (`server.key` con permisos `0600`).
+  - **CSR PKCS#10 Formal:** Emite una solicitud de firma con `CommonName = <nodeId>` y `Organization = Bindu`.
+  - **Firma Automática con Root Signer:** El lector negocia con el endpoint seguro del Root Gateway (`POST https://<root-host>:8444/api/v1/tls/sign-node`) autenticado con credenciales de agente de enrolamiento (`enrollment_agent`). El Root emite el certificado X.509 (`server.crt` con permisos `0644`) firmado por la CA interna de la malla (`bindu-mesh-ca`).
+  - **Persistencia y Reutilización Atómica:** Las credenciales se almacenan en `/customer_apps/tls/` (`server.key`, `server.crt`, `ca.crt`). En arranques posteriores, valida la vigencia temporal y el Subject CN sin solicitar firmas redundantes.
+  - **Renovación Silenciosa en Background:** Un ticker en background cada 12 horas evalúa la validez restante; si el certificado expira en menos de 30 días (< 20% de vida útil), genera un nuevo par de claves y renueva el certificado en caliente sin interrumpir la operación del lector.
 - **Arquitectura Bottom-Up Invariable**: Siguiendo las directrices canónicas de Bindu 0.17.520 y la documentación de arquitectura (`GEMINI.md` / `BINDU.md`), el nodo de borde emite toda su telemetría y eventos de abajo hacia arriba (*Bottom-Up*):
   - Enrutamiento estricto: `routing: ["local", "parent"]`.
   - Prohibido terminantemente el enrutamiento `"child"` desde nodos hoja hacia el Gateway.
@@ -391,9 +398,9 @@ bindu-studio solution pack --id rfid-industrial-proximity-guardian-mas --strict=
 El agente de borde se ejecuta de forma nativa en la CPU interna ARMv7 del lector Sensormatic IDX-4000:
 
 ```bash
-# 1. Compilación cruzada estática para ARMv7 (Linux 32-bit)
+# 1. Compilación cruzada estática para ARMv7 (Linux 32-bit) incluyendo el módulo de enrolamiento
 CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags="-s -w" \
-  -o edge_agent/idx4000_edge_agent edge_agent/main.go edge_agent/bitreader.go
+  -o edge_agent/idx4000_edge_agent edge_agent/main.go edge_agent/bitreader.go edge_agent/enrollment.go
 
 # 2. Subida atómica al lector vía FTP (/customer_apps/)
 curl -u admin:USBB24 -T edge_agent/idx4000_edge_agent ftp://192.168.1.143/idx4000_edge_agent.new
@@ -407,7 +414,15 @@ ftp.rename('idx4000_edge_agent.new', 'idx4000_edge_agent')
 ftp.quit()
 "
 
-# 4. Inspección de logs en tiempo real desde el lector
+# 4. Flags de ejecución soportados (con auto-enrolamiento y renovación mTLS)
+/customer_apps/idx4000_edge_agent \
+  -mesh-host "192.168.1.111" -mesh-port 1883 \
+  -root-host "192.168.1.111" -root-https-port 8444 -root-http-port 8080 \
+  -enroll-user "enrollment_agent" -enroll-pass "HhAuth2026!" \
+  -tls-dir "/customer_apps/tls" \
+  -user dtorreci -pass "BinduMaster2026!"
+
+# 5. Inspección de logs en tiempo real desde el lector
 python3 -c "
 import ftplib
 ftp = ftplib.FTP('192.168.1.143')
@@ -427,6 +442,7 @@ print('\n'.join(lines[-25:]))
 2. **Prioridad Explicita vs Few-Shot:** En modelos pequeños (SLMs de 1.5B), si el ejemplo *few-shot* del prompt contiene una lengua fija (como el castellano), el modelo puede ignorar el prefijo telefónico y copiar el ejemplo. Especificar `target_language` dinámicamente y priorizar el campo `language` sobre el prefijo elimina este sesgo.
 3. **Persistencia de Sesiones WhatsApp Web:** Las credenciales y claves Signal de WhatsApp Web residen en `/home/dtp/.bindu/root/runtime/data/whatsapp_web_session.db`, permitiendo reiniciar demonios o actualizar plugins BPR sin perder la autenticación ni requerir escanear un nuevo código QR.
 4. **Resiliencia en Borde Cero-MQTT:** Desplegar el agente en la CPU interna del Sensormatic IDX-4000 con identidad inmutable basada en MAC elimina los problemas de seguridad, enrutamiento y cambios de IP característicos de entornos de almacén y logística industrial.
-5. **Diagnóstico del "Lector Zombi" y Desfase Temporal:** Si el Gateway central Bindu Root se reinicia, el socket TCP mTLS se cierra. En implementaciones donde las lecturas LLRP se procesan en goroutines desacopladas sin supervisión de socket, el hardware RFID continúa radiando RF y el LED de lectura parpadea físicamente ante tags reales, pero las tramas caen al suelo en silencio. Al implementar el patrón `HealthGuard` con `MessagePing` periódico bidireccional, cualquier desconexión MQTT aborta de inmediato el bucle LLRP y fuerza una reconexión ordenada completa, garantizando latencias < 15ms en cuanto se restablece el enlace.
-6. **Alineación Atómica Obligatoria en ARMv7 (32-bit):** Las llamadas de `sync/atomic` sobre enteros de 64 bits (`int64`, `uint64`) en Linux ARMv7 provocan un *panic* fatal (`unaligned 64-bit atomic operation`) si el campo no reside en una dirección múltiplo de 8 bytes. La solución idiomática y robusta consiste en emplear los tipos `atomic.Int64` y situarlos al inicio de la estructura Go (`struct Agent`).
-7. **Reemplazo Atómico de Binarios en Ejecución (Evitar ETXTBSY):** Intentar sobreescribir vía FTP un binario en ejecución devuelve error `553 Could not create file` (`ETXTBSY - Text file busy`). En sistemas POSIX/Linux, la llamada `rename()` (`mv`) es atómica a nivel de inodo y no abre el descriptor en modo truncado: subir el artefacto como `*.new` y renombrarlo sobre el binario en ejecución sustituye la entrada en el directorio sin interrumpir el proceso activo hasta su siguiente recarga.
+5. **Enrolamiento Criptográfico Autónomo (Zero-Touch Provisioning):** Al arrancar por primera vez sin credenciales en `/customer_apps/tls/`, el lector genera su propio par de claves RSA-2048, crea un CSR PKCS#10 y negocia un certificado con el signer de Root (`POST /api/v1/tls/sign-node`). Ni la clave privada abandona el dispositivo ni un operario debe copiar certificados manualmente, replicando con exactitud la arquitectura de seguridad probada en `HH-mas-solution`.
+6. **Diagnóstico del "Lector Zombi" y Desfase Temporal:** Si el Gateway central Bindu Root se reinicia, el socket TCP mTLS se cierra. En implementaciones donde las lecturas LLRP se procesan en goroutines desacopladas sin supervisión de socket, el hardware RFID continúa radiando RF y el LED de lectura parpadea físicamente ante tags reales, pero las tramas caen al suelo en silencio. Al implementar el patrón `HealthGuard` con `MessagePing` periódico bidireccional, cualquier desconexión MQTT aborta de inmediato el bucle LLRP y fuerza una reconexión ordenada completa, garantizando latencias < 15ms en cuanto se restablece el enlace.
+7. **Alineación Atómica Obligatoria en ARMv7 (32-bit):** Las llamadas de `sync/atomic` sobre enteros de 64 bits (`int64`, `uint64`) en Linux ARMv7 provocan un *panic* fatal (`unaligned 64-bit atomic operation`) si el campo no reside en una dirección múltiplo de 8 bytes. La solución idiomática y robusta consiste en emplear los tipos `atomic.Int64` y situarlos al inicio de la estructura Go (`struct Agent`).
+8. **Reemplazo Atómico de Binarios en Ejecución (Evitar ETXTBSY):** Intentar sobreescribir vía FTP un binario en ejecución devuelve error `553 Could not create file` (`ETXTBSY - Text file busy`). En sistemas POSIX/Linux, la llamada `rename()` (`mv`) es atómica a nivel de inodo y no abre el descriptor en modo truncado: subir el artefacto como `*.new` y renombrarlo sobre el binario en ejecución sustituye la entrada en el directorio sin interrumpir el proceso activo hasta su siguiente recarga.
