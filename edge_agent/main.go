@@ -291,35 +291,34 @@ func (a *Agent) run() error {
 		}
 		fmt.Printf("[MQTT] ✅ Enlace mTLS autenticado exitosamente (NodeID: %s, User: %s)\n", a.nodeID, a.mqttUser)
 
-		// 1. Emitir NodePresence de arranque
+		// 1. Conectar a LLRP interno primero para que el estado del servicio esté activo
+		fmt.Printf("[CONEXIÓN] Conectando a servicio interno LLRP (%s)...\n", a.llrpAddr)
+		if err := a.connectLLRP(); err != nil {
+			fmt.Printf("[LLRP] ⚠️ Error conectando con ireader daemon: %v. Reintentando en 3s...\n", err)
+			a.sendErrorEvent("LLRP_DAEMON_CONNECT_FAILED", fmt.Sprintf("Error conectando con ireader: %v", err), "")
+			a.disconnectMQTT()
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		fmt.Println("[LLRP] ✅ Conexión establecida con servicio RFID local de Sensormatic.")
+
+		// 2. Emitir NodePresence de arranque
 		if err := a.sendNodePresence(); err != nil {
 			fmt.Printf("[PRESENCE] ⚠️ Fallo al emitir NodePresence inicial: %v\n", err)
 		} else {
 			fmt.Println("[PRESENCE] 🟢 NodePresence inicial registrado con éxito en Bindu Root.")
 		}
 
-		// 2. Emitir MessageState inicial
+		// 3. Emitir MessageState inicial (con ireader ya conectado y verificado)
 		if err := a.sendMessageState(); err != nil {
 			fmt.Printf("[STATE] ⚠️ Fallo al emitir MessageState inicial: %v\n", err)
 		} else {
 			fmt.Println("[STATE] 📊 MessageState inicial emitido (Salud y recursos del hardware).")
 		}
 
-		// 3. Goroutines de eventos del sistema (Heartbeats, State y Ping)
+		// 4. Goroutines de eventos del sistema (Heartbeats, State y Ping)
 		stopLoops := make(chan struct{})
 		go a.startSystemEventLoops(stopLoops)
-
-		// 4. Conectar a LLRP interno
-		fmt.Printf("[CONEXIÓN] Conectando a servicio interno LLRP (%s)...\n", a.llrpAddr)
-		if err := a.connectLLRP(); err != nil {
-			fmt.Printf("[LLRP] ⚠️ Error conectando con ireader daemon: %v. Reintentando en 3s...\n", err)
-			a.sendErrorEvent("LLRP_DAEMON_CONNECT_FAILED", fmt.Sprintf("Error conectando con ireader: %v", err), "")
-			close(stopLoops)
-			a.disconnectMQTT()
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		fmt.Println("[LLRP] ✅ Conexión establecida con servicio RFID local de Sensormatic.")
 
 		// 5. Configurar y arrancar ROSpec
 		fmt.Printf("[ROSPEC] Configurando ROSpec #1 (Antena %d a %d dBm)...\n", a.antennaID, a.powerDbm)
@@ -683,11 +682,31 @@ func (a *Agent) collectLinuxSystemMetrics() SystemMetrics {
 		m.DiskUsedPct = math.Round(((float64(usedBytes)/float64(totalBytes))*100.0)*10) / 10
 	}
 
-	// 4. ireader status
-	if a.llrpConn != nil {
-		m.IReaderStatus = "running"
-	} else {
-		m.IReaderStatus = "disconnected"
+	// 4. ireader status e inspección de proceso nativo en /proc
+	if entries, err := os.ReadDir("/proc"); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			pid, err := strconv.Atoi(e.Name())
+			if err != nil {
+				continue
+			}
+			if comm, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid)); err == nil {
+				if strings.TrimSpace(string(comm)) == "ireader" {
+					m.IReaderPID = pid
+					m.IReaderStatus = "running"
+					break
+				}
+			}
+		}
+	}
+	if m.IReaderStatus != "running" {
+		if a.llrpConn != nil || a.running {
+			m.IReaderStatus = "running"
+		} else {
+			m.IReaderStatus = "disconnected"
+		}
 	}
 
 	return m
